@@ -11,6 +11,7 @@ class Task {
   final String priority;
   final String dueDate;
   final String projectId;
+  String? assigneeId;
   TaskStatus status;
   final double? progress;
 
@@ -23,6 +24,7 @@ class Task {
     required this.priority,
     required this.dueDate,
     required this.projectId,
+    this.assigneeId,
     this.status = TaskStatus.assigned,
     this.progress,
   });
@@ -223,14 +225,78 @@ class DummyData {
     ),
   ];
 
-  static List<Task> getTasksForProject(String? projectId) {
-    if (projectId == null) {
-      return members.expand((m) => m.tasks).toList();
+  static final List<Task> unassignedTasks = [];
+
+  static void addTask(Task task) {
+    if (task.assigneeId != null) {
+      final member = members.firstWhere(
+        (m) => m.id == task.assigneeId,
+        orElse: () => members.first,
+      );
+      if (!member.tasks.any((t) => t.id == task.id)) {
+        member.tasks.add(task);
+      }
+    } else {
+      if (!unassignedTasks.any((t) => t.id == task.id)) {
+        unassignedTasks.add(task);
+      }
     }
-    return members
+  }
+
+  static void updateTaskStatus(String taskId, TaskStatus newStatus) {
+    for (final member in members) {
+      for (final task in member.tasks) {
+        if (task.id == taskId) {
+          task.status = newStatus;
+          return;
+        }
+      }
+    }
+    for (final task in unassignedTasks) {
+      if (task.id == taskId) {
+        task.status = newStatus;
+        return;
+      }
+    }
+  }
+
+  static void finishProject(String projectId) {
+    for (final member in members) {
+      for (final task in member.tasks) {
+        if (task.projectId == projectId) {
+          task.status = TaskStatus.done;
+        }
+      }
+    }
+    for (final task in unassignedTasks) {
+      if (task.projectId == projectId) {
+        task.status = TaskStatus.done;
+      }
+    }
+  }
+
+  static void assignTaskToMember(String taskId, String memberId) {
+    final index = unassignedTasks.indexWhere((t) => t.id == taskId);
+    if (index != -1) {
+      final task = unassignedTasks.removeAt(index);
+      task.assigneeId = memberId;
+      final member = members.firstWhere((m) => m.id == memberId);
+      member.tasks.add(task);
+    }
+  }
+
+  static List<Task> getUnassignedTasksForProject(String? projectId) {
+    if (projectId == null) return unassignedTasks;
+    return unassignedTasks.where((t) => t.projectId == projectId).toList();
+  }
+
+  static List<Task> getTasksForProject(String? projectId) {
+    final memberTasks = members
         .expand((m) => m.tasks)
-        .where((t) => t.projectId == projectId)
-        .toList();
+        .where((t) => projectId == null || t.projectId == projectId);
+    final unassigned = unassignedTasks
+        .where((t) => projectId == null || t.projectId == projectId);
+    return [...memberTasks, ...unassigned];
   }
 
   static List<TeamMember> getMembersForProject(String? projectId) {

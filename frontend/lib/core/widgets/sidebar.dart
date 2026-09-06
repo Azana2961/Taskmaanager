@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/dummy_data.dart';
+import 'create_project_dialog.dart';
 
 class Sidebar extends StatelessWidget {
   const Sidebar({
@@ -8,12 +9,14 @@ class Sidebar extends StatelessWidget {
     this.selectedProjectId,
     this.onNavTap,
     this.onProjectTap,
+    this.onProjectAdded,
   });
 
   final String activeItem;
   final String? selectedProjectId;
   final void Function(String item)? onNavTap;
   final void Function(String? projectId)? onProjectTap;
+  final void Function(Project project)? onProjectAdded;
 
   @override
   Widget build(BuildContext context) {
@@ -72,16 +75,35 @@ class Sidebar extends StatelessWidget {
                     letterSpacing: 1.2,
                   ),
                 ),
-                InkWell(
-                  onTap: () {
-                    // Logic to add project can be added here
-                  },
-                  child: const Icon(Icons.add, color: Colors.white54, size: 16),
+                Tooltip(
+                  message: 'Add Project',
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () async {
+                      final newProject = await CreateProjectDialog.show(
+                        context,
+                        onProjectCreated: (proj) {
+                          onProjectAdded?.call(proj);
+                          onProjectTap?.call(proj.id);
+                        },
+                      );
+                      if (newProject != null && onProjectTap != null) {
+                        onProjectTap!(newProject.id);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Icon(Icons.add, color: Colors.white70, size: 16),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-          _buildProjectItem(Colors.grey, 'All Projects', null),
           ...DummyData.projects.map((p) => _buildProjectItem(p.color, p.name, p.id)),
 
           const Spacer(),
@@ -94,8 +116,8 @@ class Sidebar extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.white.withOpacity(0.0),
-                  Colors.white.withOpacity(0.05),
+                  Colors.white.withValues(alpha: 0.0),
+                  Colors.white.withValues(alpha: 0.05),
                 ],
               ),
             ),
@@ -131,7 +153,7 @@ class Sidebar extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
-        color: isActive ? Colors.white.withOpacity(0.1) : Colors.transparent,
+        color: isActive ? Colors.white.withValues(alpha: 0.1) : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
       ),
       child: ListTile(
@@ -156,7 +178,7 @@ class Sidebar extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       decoration: BoxDecoration(
-        color: isActive ? Colors.white.withOpacity(0.1) : Colors.transparent,
+        color: isActive ? Colors.white.withValues(alpha: 0.1) : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
       ),
       child: ListTile(

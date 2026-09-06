@@ -28,7 +28,8 @@ class Header extends StatelessWidget {
                 decoration: InputDecoration(
                   hintText: 'Search tasks, projects...',
                   hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-                  prefixIcon: Icon(Icons.search, color: Color(0xFF94A3B8), size: 20),
+                  prefixIcon:
+                      Icon(Icons.search, color: Color(0xFF94A3B8), size: 20),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(vertical: 10),
                 ),
@@ -36,14 +37,14 @@ class Header extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 24),
-          
+
           // Notification Bell
           IconButton(
             icon: const Icon(Icons.notifications_none, color: Color(0xFF64748B)),
             onPressed: () {},
           ),
           const SizedBox(width: 16),
-          
+
           // User Profile
           Row(
             children: [
@@ -67,7 +68,7 @@ class Header extends StatelessWidget {
                 backgroundColor: Colors.grey[200],
                 backgroundImage: const NetworkImage(
                   'https://i.pravatar.cc/150?img=47',
-                ), // Dummy avatar matching mockup style
+                ),
               ),
             ],
           ),

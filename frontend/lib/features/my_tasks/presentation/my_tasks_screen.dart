@@ -55,7 +55,9 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
   }
 
   void _startTask(_Task task) {
-    _showSnackbar('Started: ${task.title}', const Color(0xFF2563EB));
+    data.DummyData.updateTaskStatus(task.id, data.TaskStatus.inProgress);
+    setState(() {});
+    _showSnackbar('Started: "${task.title}" (moved to In Progress)', const Color(0xFF2563EB));
   }
 
   void _submitTask(_Task task) {
@@ -64,7 +66,9 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
       builder: (ctx) => _SubmitDialog(
         task: task,
         onConfirm: () {
-          _showSnackbar('Task submitted: ${task.title}', Colors.green);
+          data.DummyData.updateTaskStatus(task.id, data.TaskStatus.done);
+          setState(() {});
+          _showSnackbar('Task submitted: "${task.title}" (moved to Done) 🎉', Colors.green);
         },
       ),
     );
@@ -94,6 +98,7 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
             selectedProjectId: widget.selectedProjectId,
             onNavTap: widget.onNavTap,
             onProjectTap: widget.onProjectTap,
+            onProjectAdded: (p) => setState(() {}),
           ),
           Expanded(
             child: Column(

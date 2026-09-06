@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'core/data/dummy_data.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/my_tasks/presentation/my_tasks_screen.dart';
 import 'features/team/presentation/team_screen.dart';
@@ -34,7 +35,14 @@ class _AppShell extends StatefulWidget {
 
 class _AppShellState extends State<_AppShell> {
   String _activeItem = 'Dashboard';
-  String? _selectedProjectId;
+  late String _selectedProjectId;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedProjectId =
+        DummyData.projects.isNotEmpty ? DummyData.projects.first.id : 'p1';
+  }
 
   Widget _buildPage() {
     switch (_activeItem) {
@@ -67,7 +75,9 @@ class _AppShellState extends State<_AppShell> {
   }
 
   void _onProjectTap(String? projectId) {
-    setState(() => _selectedProjectId = projectId);
+    if (projectId != null) {
+      setState(() => _selectedProjectId = projectId);
+    }
   }
 
   @override
