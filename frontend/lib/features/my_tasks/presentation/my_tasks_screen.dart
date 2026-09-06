@@ -1,100 +1,61 @@
 import 'package:flutter/material.dart';
 import '../../../core/widgets/header.dart';
 import '../../../core/widgets/sidebar.dart';
+import '../../../core/data/dummy_data.dart' as data;
 
 class MyTasksScreen extends StatefulWidget {
   const MyTasksScreen({
     super.key,
     this.activeItem = 'My Tasks',
+    this.selectedProjectId,
     this.onNavTap,
+    this.onProjectTap,
   });
 
   final String activeItem;
+  final String? selectedProjectId;
   final void Function(String item)? onNavTap;
+  final void Function(String? projectId)? onProjectTap;
 
   @override
   State<MyTasksScreen> createState() => _MyTasksScreenState();
 }
 
 class _MyTasksScreenState extends State<MyTasksScreen> {
-  // --- Mock Data ---
-  final List<_Task> _pendingTasks = [
-    _Task(
-      id: '1',
-      tag: 'Design',
-      tagColor: Colors.purple,
-      title: 'Create onboarding wireframes',
-      description: 'Design wireframes for the new user onboarding flow.',
-      dueDate: 'Sep 10',
-      priority: 'High',
-    ),
-    _Task(
-      id: '2',
-      tag: 'Dev',
-      tagColor: Colors.blue,
-      title: 'Set up CI/CD pipeline',
-      description: 'Configure GitHub Actions for automated builds and deployments.',
-      dueDate: 'Sep 12',
-      priority: 'Medium',
-    ),
-    _Task(
-      id: '3',
-      tag: 'Bug',
-      tagColor: Colors.orange,
-      title: 'Fix login redirect issue',
-      description: 'Users are being redirected to a blank page after login.',
-      dueDate: 'Sep 8',
-      priority: 'High',
-    ),
-    _Task(
-      id: '4',
-      tag: 'Docs',
-      tagColor: Colors.teal,
-      title: 'Write API documentation',
-      description: 'Document all REST endpoints for the v2 API.',
-      dueDate: 'Sep 15',
-      priority: 'Low',
-    ),
-    _Task(
-      id: '5',
-      tag: 'Marketing',
-      tagColor: Colors.pink,
-      title: 'Draft Q4 campaign brief',
-      description: 'Create the brief for the upcoming Q4 marketing campaign.',
-      dueDate: 'Sep 20',
-      priority: 'Medium',
-    ),
-  ];
+  // Tasks sourced from DummyData, filtered by selectedProjectId
+  List<_Task> get _pendingTasks {
+    return data.DummyData.getTasksForProject(widget.selectedProjectId)
+        .where((t) => t.status == data.TaskStatus.assigned)
+        .map((t) => _Task(
+              id: t.id,
+              tag: t.tag,
+              tagColor: t.tagColor,
+              title: t.title,
+              description: t.description,
+              dueDate: t.dueDate,
+              priority: t.priority,
+            ))
+        .toList();
+  }
 
-  final List<_Task> _runningTasks = [
-    _Task(
-      id: '6',
-      tag: 'Dev',
-      tagColor: Colors.blue,
-      title: 'Implement authentication flow',
-      description: 'Build JWT-based auth with refresh tokens.',
-      dueDate: 'Today',
-      priority: 'High',
-      progress: 0.65,
-    ),
-    _Task(
-      id: '7',
-      tag: 'Design',
-      tagColor: Colors.purple,
-      title: 'Design new landing page hero',
-      description: 'Create a modern hero section for the marketing site.',
-      dueDate: 'Today',
-      priority: 'Medium',
-      progress: 0.4,
-    ),
-  ];
+  List<_Task> get _runningTasks {
+    return data.DummyData.getTasksForProject(widget.selectedProjectId)
+        .where((t) => t.status == data.TaskStatus.inProgress)
+        .map((t) => _Task(
+              id: t.id,
+              tag: t.tag,
+              tagColor: t.tagColor,
+              title: t.title,
+              description: t.description,
+              dueDate: t.dueDate,
+              priority: t.priority,
+              progress: t.progress ?? 0.1,
+            ))
+        .toList();
+  }
 
   void _startTask(_Task task) {
-    setState(() {
-      _pendingTasks.remove(task);
-      _runningTasks.add(task.copyWith(progress: 0.05));
-    });
-    _showSnackbar('Task started: ${task.title}', const Color(0xFF2563EB));
+    _showSnackbar('Started: ${task.title}', const Color(0xFF2563EB));
   }
 
   void _submitTask(_Task task) {
@@ -103,7 +64,6 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
       builder: (ctx) => _SubmitDialog(
         task: task,
         onConfirm: () {
-          setState(() => _runningTasks.remove(task));
           _showSnackbar('Task submitted: ${task.title}', Colors.green);
         },
       ),
@@ -129,7 +89,12 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
       backgroundColor: const Color(0xFFF8FAFC),
       body: Row(
         children: [
-          Sidebar(activeItem: widget.activeItem, onNavTap: widget.onNavTap),
+          Sidebar(
+            activeItem: widget.activeItem,
+            selectedProjectId: widget.selectedProjectId,
+            onNavTap: widget.onNavTap,
+            onProjectTap: widget.onProjectTap,
+          ),
           Expanded(
             child: Column(
               children: [

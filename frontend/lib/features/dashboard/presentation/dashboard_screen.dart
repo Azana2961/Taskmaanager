@@ -9,11 +9,15 @@ class DashboardScreen extends StatelessWidget {
   const DashboardScreen({
     super.key,
     this.activeItem = 'Dashboard',
+    this.selectedProjectId,
     this.onNavTap,
+    this.onProjectTap,
   });
 
   final String activeItem;
+  final String? selectedProjectId;
   final void Function(String item)? onNavTap;
+  final void Function(String? projectId)? onProjectTap;
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +26,12 @@ class DashboardScreen extends StatelessWidget {
       body: Row(
         children: [
           // Left Sidebar
-          Sidebar(activeItem: activeItem, onNavTap: onNavTap),
+          Sidebar(
+            activeItem: activeItem,
+            selectedProjectId: selectedProjectId,
+            onNavTap: onNavTap,
+            onProjectTap: onProjectTap,
+          ),
           
           // Main Content Area
           Expanded(
@@ -39,7 +48,7 @@ class DashboardScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Stats Row (Total Tasks, In Progress, etc.)
-                        const StatsRow(),
+                        StatsRow(selectedProjectId: selectedProjectId),
                         const SizedBox(height: 32),
                         
                         // Board & Workload section
@@ -47,9 +56,9 @@ class DashboardScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // Kanban Board takes up more space
-                            const Expanded(
+                            Expanded(
                               flex: 3,
-                              child: TaskBoard(),
+                              child: TaskBoard(selectedProjectId: selectedProjectId),
                             ),
                             const SizedBox(width: 24),
                             // Right Insights Panel

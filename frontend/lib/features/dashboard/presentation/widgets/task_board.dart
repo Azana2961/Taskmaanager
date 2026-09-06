@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
+import '../../../../core/data/dummy_data.dart';
 
 class TaskBoard extends StatelessWidget {
-  const TaskBoard({super.key});
+  const TaskBoard({super.key, this.selectedProjectId});
+  final String? selectedProjectId;
 
   @override
   Widget build(BuildContext context) {
+    final tasks = DummyData.getTasksForProject(selectedProjectId);
+    final todo = tasks.where((t) => t.status == TaskStatus.assigned).toList();
+    final inProgress = tasks.where((t) => t.status == TaskStatus.inProgress).toList();
+    final done = tasks.where((t) => t.status == TaskStatus.done).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -63,37 +70,27 @@ class TaskBoard extends StatelessWidget {
             Expanded(
               child: _buildColumn(
                 'To Do', 
-                3, 
+                todo.length, 
                 Colors.grey, 
-                [
-                  _buildTaskCard('Strategy', 'Research competitor analysis', 'Tomorrow', Colors.purple[50]!, Colors.purple, ['https://i.pravatar.cc/150?img=1']),
-                  _buildTaskCard('Docs', 'Update client documentation', 'Dec 15', Colors.blue[50]!, Colors.blue, ['https://i.pravatar.cc/150?img=2']),
-                  _buildTaskCard('Bug', 'Fix navigation bug on mobile', 'Dec 18', Colors.orange[50]!, Colors.orange, ['https://i.pravatar.cc/150?img=3']),
-                ],
+                todo.map((t) => _buildTaskCard(t.tag, t.title, t.dueDate, t.tagColor.withValues(alpha: 0.1), t.tagColor, ['https://i.pravatar.cc/150?img=1'])).toList(),
               ),
             ),
             const SizedBox(width: 24),
             Expanded(
               child: _buildColumn(
                 'In Progress', 
-                2, 
+                inProgress.length, 
                 const Color(0xFF2563EB), 
-                [
-                  _buildTaskCard('Design', 'Design new landing page hero', 'Today', Colors.blue[50]!, Colors.blue, ['https://i.pravatar.cc/150?img=4', 'https://i.pravatar.cc/150?img=5']),
-                  _buildTaskCard('Dev', 'Implement authentication flow', 'Today', Colors.green[50]!, Colors.green, ['https://i.pravatar.cc/150?img=6']),
-                ],
+                inProgress.map((t) => _buildTaskCard(t.tag, t.title, t.dueDate, t.tagColor.withValues(alpha: 0.1), t.tagColor, ['https://i.pravatar.cc/150?img=4'])).toList(),
               ),
             ),
             const SizedBox(width: 24),
             Expanded(
               child: _buildColumn(
                 'Done', 
-                2, 
+                done.length, 
                 Colors.green, 
-                [
-                  _buildTaskCard('Meeting', 'Weekly team sync meeting', 'Yesterday', Colors.blue[50]!, Colors.blue, ['https://i.pravatar.cc/150?img=7']),
-                  _buildTaskCard('Marketing', 'Q4 Marketing Plan Review', 'Dec 10', Colors.purple[50]!, Colors.purple, ['https://i.pravatar.cc/150?img=8', 'https://i.pravatar.cc/150?img=9']),
-                ],
+                done.map((t) => _buildTaskCard(t.tag, t.title, t.dueDate, t.tagColor.withValues(alpha: 0.1), t.tagColor, ['https://i.pravatar.cc/150?img=7'])).toList(),
               ),
             ),
           ],

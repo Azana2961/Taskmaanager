@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/my_tasks/presentation/my_tasks_screen.dart';
+import 'features/team/presentation/team_screen.dart';
 
 class TaskSyncApp extends StatelessWidget {
   const TaskSyncApp({super.key});
@@ -33,24 +34,40 @@ class _AppShell extends StatefulWidget {
 
 class _AppShellState extends State<_AppShell> {
   String _activeItem = 'Dashboard';
+  String? _selectedProjectId;
 
   Widget _buildPage() {
     switch (_activeItem) {
       case 'My Tasks':
         return MyTasksScreen(
           activeItem: _activeItem,
+          selectedProjectId: _selectedProjectId,
           onNavTap: _onNavTap,
+          onProjectTap: _onProjectTap,
+        );
+      case 'Team':
+        return TeamScreen(
+          activeItem: _activeItem,
+          selectedProjectId: _selectedProjectId,
+          onNavTap: _onNavTap,
+          onProjectTap: _onProjectTap,
         );
       default:
         return DashboardScreen(
           activeItem: _activeItem,
+          selectedProjectId: _selectedProjectId,
           onNavTap: _onNavTap,
+          onProjectTap: _onProjectTap,
         );
     }
   }
 
   void _onNavTap(String item) {
     setState(() => _activeItem = item);
+  }
+
+  void _onProjectTap(String? projectId) {
+    setState(() => _selectedProjectId = projectId);
   }
 
   @override
