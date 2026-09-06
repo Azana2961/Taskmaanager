@@ -1,0 +1,820 @@
+import 'package:flutter/material.dart';
+import '../../../core/widgets/header.dart';
+import '../../../core/widgets/sidebar.dart';
+
+class MyTasksScreen extends StatefulWidget {
+  const MyTasksScreen({
+    super.key,
+    this.activeItem = 'My Tasks',
+    this.onNavTap,
+  });
+
+  final String activeItem;
+  final void Function(String item)? onNavTap;
+
+  @override
+  State<MyTasksScreen> createState() => _MyTasksScreenState();
+}
+
+class _MyTasksScreenState extends State<MyTasksScreen> {
+  // --- Mock Data ---
+  final List<_Task> _pendingTasks = [
+    _Task(
+      id: '1',
+      tag: 'Design',
+      tagColor: Colors.purple,
+      title: 'Create onboarding wireframes',
+      description: 'Design wireframes for the new user onboarding flow.',
+      dueDate: 'Sep 10',
+      priority: 'High',
+    ),
+    _Task(
+      id: '2',
+      tag: 'Dev',
+      tagColor: Colors.blue,
+      title: 'Set up CI/CD pipeline',
+      description: 'Configure GitHub Actions for automated builds and deployments.',
+      dueDate: 'Sep 12',
+      priority: 'Medium',
+    ),
+    _Task(
+      id: '3',
+      tag: 'Bug',
+      tagColor: Colors.orange,
+      title: 'Fix login redirect issue',
+      description: 'Users are being redirected to a blank page after login.',
+      dueDate: 'Sep 8',
+      priority: 'High',
+    ),
+    _Task(
+      id: '4',
+      tag: 'Docs',
+      tagColor: Colors.teal,
+      title: 'Write API documentation',
+      description: 'Document all REST endpoints for the v2 API.',
+      dueDate: 'Sep 15',
+      priority: 'Low',
+    ),
+    _Task(
+      id: '5',
+      tag: 'Marketing',
+      tagColor: Colors.pink,
+      title: 'Draft Q4 campaign brief',
+      description: 'Create the brief for the upcoming Q4 marketing campaign.',
+      dueDate: 'Sep 20',
+      priority: 'Medium',
+    ),
+  ];
+
+  final List<_Task> _runningTasks = [
+    _Task(
+      id: '6',
+      tag: 'Dev',
+      tagColor: Colors.blue,
+      title: 'Implement authentication flow',
+      description: 'Build JWT-based auth with refresh tokens.',
+      dueDate: 'Today',
+      priority: 'High',
+      progress: 0.65,
+    ),
+    _Task(
+      id: '7',
+      tag: 'Design',
+      tagColor: Colors.purple,
+      title: 'Design new landing page hero',
+      description: 'Create a modern hero section for the marketing site.',
+      dueDate: 'Today',
+      priority: 'Medium',
+      progress: 0.4,
+    ),
+  ];
+
+  void _startTask(_Task task) {
+    setState(() {
+      _pendingTasks.remove(task);
+      _runningTasks.add(task.copyWith(progress: 0.05));
+    });
+    _showSnackbar('Task started: ${task.title}', const Color(0xFF2563EB));
+  }
+
+  void _submitTask(_Task task) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _SubmitDialog(
+        task: task,
+        onConfirm: () {
+          setState(() => _runningTasks.remove(task));
+          _showSnackbar('Task submitted: ${task.title}', Colors.green);
+        },
+      ),
+    );
+  }
+
+  void _showSnackbar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(color: Colors.white)),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: Row(
+        children: [
+          Sidebar(activeItem: widget.activeItem, onNavTap: widget.onNavTap),
+          Expanded(
+            child: Column(
+              children: [
+                const Header(),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Page Header
+                        _buildPageHeader(),
+                        const SizedBox(height: 24),
+
+                        // Summary chips
+                        _buildSummaryRow(),
+                        const SizedBox(height: 32),
+
+                        // Two Columns
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Pending Tasks Column
+                            Expanded(
+                              child: _buildPendingColumn(),
+                            ),
+                            const SizedBox(width: 24),
+                            // Running Tasks Column
+                            Expanded(
+                              child: _buildRunningColumn(),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPageHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'My Tasks',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Manage and track your assigned tasks.',
+              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            ),
+          ],
+        ),
+        OutlinedButton.icon(
+          onPressed: () {},
+          icon: const Icon(Icons.filter_list, size: 18),
+          label: const Text('Filter', style: TextStyle(color: Color(0xFF1E293B))),
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: Color(0xFFE2E8F0)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryRow() {
+    return Row(
+      children: [
+        _buildChip(
+          Icons.hourglass_empty_rounded,
+          '${_pendingTasks.length} Pending',
+          const Color(0xFFFFF7ED),
+          const Color(0xFFEA580C),
+        ),
+        const SizedBox(width: 12),
+        _buildChip(
+          Icons.bolt_rounded,
+          '${_runningTasks.length} In Progress',
+          const Color(0xFFEFF6FF),
+          const Color(0xFF2563EB),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChip(IconData icon, String label, Color bg, Color fg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 15, color: fg),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: fg,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPendingColumn() {
+    return _TaskColumn(
+      title: 'Pending Tasks',
+      count: _pendingTasks.length,
+      dotColor: const Color(0xFFEA580C),
+      headerBadgeColor: const Color(0xFFFFF7ED),
+      headerBadgeTextColor: const Color(0xFFEA580C),
+      emptyMessage: 'No pending tasks. Great job! 🎉',
+      children: _pendingTasks.map((task) {
+        return _PendingTaskCard(
+          task: task,
+          onStart: () => _startTask(task),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildRunningColumn() {
+    return _TaskColumn(
+      title: 'Running Tasks',
+      count: _runningTasks.length,
+      dotColor: const Color(0xFF2563EB),
+      headerBadgeColor: const Color(0xFFEFF6FF),
+      headerBadgeTextColor: const Color(0xFF2563EB),
+      emptyMessage: 'No tasks in progress yet.',
+      children: _runningTasks.map((task) {
+        return _RunningTaskCard(
+          task: task,
+          onSubmit: () => _submitTask(task),
+        );
+      }).toList(),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Column wrapper
+// ---------------------------------------------------------------------------
+class _TaskColumn extends StatelessWidget {
+  const _TaskColumn({
+    required this.title,
+    required this.count,
+    required this.dotColor,
+    required this.headerBadgeColor,
+    required this.headerBadgeTextColor,
+    required this.children,
+    required this.emptyMessage,
+  });
+
+  final String title;
+  final int count;
+  final Color dotColor;
+  final Color headerBadgeColor;
+  final Color headerBadgeTextColor;
+  final List<Widget> children;
+  final String emptyMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Column Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: dotColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: headerBadgeColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    count.toString(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: headerBadgeTextColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          const SizedBox(height: 12),
+
+          if (children.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+              child: Center(
+                child: Text(
+                  emptyMessage,
+                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            )
+          else
+            ...children,
+
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pending Task Card
+// ---------------------------------------------------------------------------
+class _PendingTaskCard extends StatelessWidget {
+  const _PendingTaskCard({required this.task, required this.onStart});
+
+  final _Task task;
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Tag + Priority Row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: task.tagColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  task.tag,
+                  style: TextStyle(
+                    color: task.tagColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              _PriorityBadge(priority: task.priority),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Title
+          Text(
+            task.title,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 15,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 6),
+
+          // Description
+          Text(
+            task.description,
+            style: TextStyle(color: Colors.grey[600], fontSize: 13),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 14),
+
+          // Footer: Due date + Start button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.calendar_today, size: 13, color: Color(0xFF94A3B8)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Due: ${task.dueDate}',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+              ElevatedButton.icon(
+                onPressed: onStart,
+                icon: const Icon(Icons.play_arrow_rounded, size: 16, color: Colors.white),
+                label: const Text(
+                  'Start',
+                  style: TextStyle(color: Colors.white, fontSize: 13),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Running Task Card
+// ---------------------------------------------------------------------------
+class _RunningTaskCard extends StatelessWidget {
+  const _RunningTaskCard({required this.task, required this.onSubmit});
+
+  final _Task task;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.25)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2563EB).withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Tag + Priority
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: task.tagColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      task.tag,
+                      style: TextStyle(
+                        color: task.tagColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.bolt_rounded, size: 12, color: Color(0xFF2563EB)),
+                        SizedBox(width: 3),
+                        Text(
+                          'In Progress',
+                          style: TextStyle(
+                            color: Color(0xFF2563EB),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              _PriorityBadge(priority: task.priority),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Title
+          Text(
+            task.title,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 15,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 6),
+
+          // Description
+          Text(
+            task.description,
+            style: TextStyle(color: Colors.grey[600], fontSize: 13),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 14),
+
+          // Progress Bar
+          Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: task.progress ?? 0.0,
+                    backgroundColor: const Color(0xFFE2E8F0),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+                    minHeight: 6,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '${((task.progress ?? 0) * 100).round()}%',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2563EB),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Footer: Due date + Submit button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.calendar_today, size: 13, color: Color(0xFF94A3B8)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Due: ${task.dueDate}',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+              ElevatedButton.icon(
+                onPressed: onSubmit,
+                icon: const Icon(Icons.check_circle_outline, size: 16, color: Colors.white),
+                label: const Text(
+                  'Submit',
+                  style: TextStyle(color: Colors.white, fontSize: 13),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green[600],
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Priority Badge
+// ---------------------------------------------------------------------------
+class _PriorityBadge extends StatelessWidget {
+  const _PriorityBadge({required this.priority});
+  final String priority;
+
+  @override
+  Widget build(BuildContext context) {
+    Color bg;
+    Color fg;
+    switch (priority) {
+      case 'High':
+        bg = const Color(0xFFFEF2F2);
+        fg = const Color(0xFFDC2626);
+        break;
+      case 'Medium':
+        bg = const Color(0xFFFFFBEB);
+        fg = const Color(0xFFD97706);
+        break;
+      default:
+        bg = const Color(0xFFF0FDF4);
+        fg = const Color(0xFF16A34A);
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        priority,
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Submit Confirmation Dialog
+// ---------------------------------------------------------------------------
+class _SubmitDialog extends StatelessWidget {
+  const _SubmitDialog({required this.task, required this.onConfirm});
+  final _Task task;
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text(
+        'Submit Task',
+        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Are you sure you want to submit this task?',
+            style: TextStyle(color: Colors.grey[600], fontSize: 14),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: task.tagColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    task.tag,
+                    style: TextStyle(color: task.tagColor, fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    task.title,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            onConfirm();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green[600],
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          child: const Text('Submit Task', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Task Model
+// ---------------------------------------------------------------------------
+class _Task {
+  final String id;
+  final String tag;
+  final Color tagColor;
+  final String title;
+  final String description;
+  final String dueDate;
+  final String priority;
+  final double? progress;
+
+  const _Task({
+    required this.id,
+    required this.tag,
+    required this.tagColor,
+    required this.title,
+    required this.description,
+    required this.dueDate,
+    required this.priority,
+    this.progress,
+  });
+
+  _Task copyWith({double? progress}) {
+    return _Task(
+      id: id,
+      tag: tag,
+      tagColor: tagColor,
+      title: title,
+      description: description,
+      dueDate: dueDate,
+      priority: priority,
+      progress: progress ?? this.progress,
+    );
+  }
+}

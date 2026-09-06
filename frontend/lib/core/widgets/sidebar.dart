@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 
 class Sidebar extends StatelessWidget {
-  const Sidebar({super.key});
+  const Sidebar({
+    super.key,
+    this.activeItem = 'Dashboard',
+    this.onNavTap,
+  });
+
+  final String activeItem;
+  final void Function(String item)? onNavTap;
 
   @override
   Widget build(BuildContext context) {
@@ -36,15 +43,15 @@ class Sidebar extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Navigation Links
-          _buildNavItem(Icons.dashboard_outlined, 'Dashboard', isActive: true),
+          _buildNavItem(Icons.dashboard_outlined, 'Dashboard'),
           _buildNavItem(Icons.check_circle_outline, 'My Tasks'),
           _buildNavItem(Icons.people_outline, 'Team'),
           _buildNavItem(Icons.settings_outlined, 'Settings'),
-          
+
           const SizedBox(height: 32),
-          
+
           // Projects Section
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
@@ -61,9 +68,9 @@ class Sidebar extends StatelessWidget {
           _buildProjectItem(Colors.blue, 'Website Redesign'),
           _buildProjectItem(Colors.purple, 'Q4 Marketing'),
           _buildProjectItem(Colors.green, 'Mobile App'),
-          
+
           const Spacer(),
-          
+
           // Bottom Storage/Plan info
           Container(
             padding: const EdgeInsets.all(24),
@@ -104,7 +111,8 @@ class Sidebar extends StatelessWidget {
     );
   }
 
-  Widget _buildNavItem(IconData icon, String title, {bool isActive = false}) {
+  Widget _buildNavItem(IconData icon, String title) {
+    final isActive = activeItem == title;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
@@ -123,7 +131,7 @@ class Sidebar extends StatelessWidget {
         ),
         dense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-        onTap: () {},
+        onTap: onNavTap != null ? () => onNavTap!(title) : null,
       ),
     );
   }
