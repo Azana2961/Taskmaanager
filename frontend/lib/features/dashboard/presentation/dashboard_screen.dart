@@ -6,7 +6,14 @@ import 'widgets/task_board.dart';
 import 'widgets/right_panel.dart';
 
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({
+    super.key,
+    this.activeItem = 'Dashboard',
+    this.onNavTap,
+  });
+
+  final String activeItem;
+  final void Function(String item)? onNavTap;
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +22,7 @@ class DashboardScreen extends StatelessWidget {
       body: Row(
         children: [
           // Left Sidebar
-          const Sidebar(),
+          Sidebar(activeItem: activeItem, onNavTap: onNavTap),
           
           // Main Content Area
           Expanded(
