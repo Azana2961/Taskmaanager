@@ -1,18 +1,26 @@
 import 'package:flutter/material.dart';
+import '../../../../core/data/dummy_data.dart';
 
 class StatsRow extends StatelessWidget {
-  const StatsRow({super.key});
+  const StatsRow({super.key, this.selectedProjectId});
+
+  final String? selectedProjectId;
 
   @override
   Widget build(BuildContext context) {
+    final tasks = DummyData.getTasksForProject(selectedProjectId);
+    final total = tasks.length;
+    final inProgress = tasks.where((t) => t.status == TaskStatus.inProgress).length;
+    final urgent = tasks.where((t) => t.priority == 'High').length;
+
     return Row(
       children: [
         Expanded(
-          child: _buildStatCard('Total Tasks', '24', '+12% 4 completed today', Icons.check_circle_outline, Colors.green),
+          child: _buildStatCard('Total Tasks', total.toString(), '+12% 4 completed today', Icons.check_circle_outline, Colors.green),
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: _buildStatCard('In Progress', '8', '0% 2 overdue', Icons.schedule, Colors.grey),
+          child: _buildStatCard('In Progress', inProgress.toString(), '0% 2 overdue', Icons.schedule, Colors.grey),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -20,7 +28,7 @@ class StatsRow extends StatelessWidget {
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: _buildStatCard('Urgent', '3', '-1 Needs attention', Icons.warning_amber_rounded, Colors.red),
+          child: _buildStatCard('Urgent', urgent.toString(), '-1 Needs attention', Icons.warning_amber_rounded, Colors.red),
         ),
       ],
     );

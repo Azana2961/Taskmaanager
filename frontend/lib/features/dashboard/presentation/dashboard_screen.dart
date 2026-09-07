@@ -5,16 +5,25 @@ import 'widgets/stats_row.dart';
 import 'widgets/task_board.dart';
 import 'widgets/right_panel.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
     super.key,
     this.activeItem = 'Dashboard',
+    this.selectedProjectId,
     this.onNavTap,
+    this.onProjectTap,
   });
 
   final String activeItem;
+  final String? selectedProjectId;
   final void Function(String item)? onNavTap;
+  final void Function(String? projectId)? onProjectTap;
 
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -22,15 +31,23 @@ class DashboardScreen extends StatelessWidget {
       body: Row(
         children: [
           // Left Sidebar
-          Sidebar(activeItem: activeItem, onNavTap: onNavTap),
-          
+          Sidebar(
+            activeItem: widget.activeItem,
+            selectedProjectId: widget.selectedProjectId,
+            onNavTap: widget.onNavTap,
+            onProjectTap: widget.onProjectTap,
+            onProjectAdded: (project) {
+              setState(() {});
+            },
+          ),
+
           // Main Content Area
           Expanded(
             child: Column(
               children: [
                 // Top Navigation/Search Bar
                 const Header(),
-                
+
                 // Scrollable Body
                 Expanded(
                   child: SingleChildScrollView(
@@ -39,23 +56,26 @@ class DashboardScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Stats Row (Total Tasks, In Progress, etc.)
-                        const StatsRow(),
+                        StatsRow(selectedProjectId: widget.selectedProjectId),
                         const SizedBox(height: 32),
-                        
+
                         // Board & Workload section
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // Kanban Board takes up more space
-                            const Expanded(
+                            Expanded(
                               flex: 3,
-                              child: TaskBoard(),
+                              child: TaskBoard(
+                                selectedProjectId: widget.selectedProjectId,
+                                onTaskAdded: () => setState(() {}),
+                              ),
                             ),
                             const SizedBox(width: 24),
                             // Right Insights Panel
-                            Expanded(
+                            const Expanded(
                               flex: 1,
-                              child: const RightPanel(),
+                              child: RightPanel(),
                             ),
                           ],
                         ),
