@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import '../data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import '../services/app_state.dart';
+import '../services/api_service.dart';
 import 'create_project_dialog.dart';
 
 class Sidebar extends StatelessWidget {
@@ -16,10 +18,12 @@ class Sidebar extends StatelessWidget {
   final String? selectedProjectId;
   final void Function(String item)? onNavTap;
   final void Function(String? projectId)? onProjectTap;
-  final void Function(Project project)? onProjectAdded;
+  final void Function(ApiProject project)? onProjectAdded;
 
   @override
   Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
+
     return Container(
       width: 250,
       color: const Color(0xFF1E1F25), // Dark theme from mockup
@@ -80,15 +84,15 @@ class Sidebar extends StatelessWidget {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(6),
                     onTap: () async {
-                      final newProject = await CreateProjectDialog.show(
+                      final result = await CreateProjectDialog.show(
                         context,
                         onProjectCreated: (proj) {
                           onProjectAdded?.call(proj);
                           onProjectTap?.call(proj.id);
                         },
                       );
-                      if (newProject != null && onProjectTap != null) {
-                        onProjectTap!(newProject.id);
+                      if (result != null && onProjectTap != null) {
+                        onProjectTap!(result.id);
                       }
                     },
                     child: Container(
@@ -104,7 +108,7 @@ class Sidebar extends StatelessWidget {
               ],
             ),
           ),
-          ...DummyData.projects.map((p) => _buildProjectItem(p.color, p.name, p.id)),
+          ...appState.projects.map((p) => _buildProjectItem(p.color, p.name, p.id)),
 
           const Spacer(),
 
@@ -130,7 +134,7 @@ class Sidebar extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  '4/5 members used',
+                  'Team Size',
                   style: TextStyle(color: Colors.white54, fontSize: 12),
                 ),
                 const SizedBox(height: 12),

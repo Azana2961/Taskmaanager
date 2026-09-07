@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'core/services/app_state.dart';
 import 'app.dart';
 
 void main() {
-  runApp(const TaskSyncApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => AppState()..loadAll(),
+      child: const TaskSyncApp(),
+    ),
+  );
 }

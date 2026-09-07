@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../../core/data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import '../../../../core/services/app_state.dart';
 
 class StatsRow extends StatelessWidget {
   const StatsRow({super.key, this.selectedProjectId});
@@ -8,9 +9,10 @@ class StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tasks = DummyData.getTasksForProject(selectedProjectId);
+    final appState = context.watch<AppState>();
+    final tasks = appState.tasksForProject(selectedProjectId);
     final total = tasks.length;
-    final inProgress = tasks.where((t) => t.status == TaskStatus.inProgress).length;
+    final inProgress = tasks.where((t) => t.status == 'IN_PROGRESS').length;
     final urgent = tasks.where((t) => t.priority == 'High').length;
 
     return Row(

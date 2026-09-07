@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../../../core/data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import '../../../../core/services/app_state.dart';
+import '../../../../core/services/api_service.dart';
 import '../../../../core/widgets/add_task_dialog.dart';
+
+
 
 class TaskBoard extends StatefulWidget {
   const TaskBoard({
@@ -20,9 +24,10 @@ class _TaskBoardState extends State<TaskBoard> {
   String _filterPriority = 'All'; // 'All', 'High', 'Medium', 'Low'
   String _filterDueDate = 'All'; // 'All', 'Today', 'This Week', 'Overdue'
 
-  void _openAddTask([TaskStatus initialStatus = TaskStatus.assigned]) async {
+  void _openAddTask([String initialStatus = 'TO_DO']) async {
+    final appState = context.read<AppState>();
     final effectiveProjectId = widget.selectedProjectId ??
-        (DummyData.projects.isNotEmpty ? DummyData.projects.first.id : 'p1');
+        (appState.projects.isNotEmpty ? appState.projects.first.id : 'p1');
     final newTask = await AddTaskDialog.show(
       context,
       projectId: effectiveProjectId,
@@ -39,11 +44,12 @@ class _TaskBoardState extends State<TaskBoard> {
   }
 
   void _confirmFinishProject() async {
+    final appState = context.read<AppState>();
     final effectiveProjectId = widget.selectedProjectId ??
-        (DummyData.projects.isNotEmpty ? DummyData.projects.first.id : 'p1');
-    final project = DummyData.projects.firstWhere(
+        (appState.projects.isNotEmpty ? appState.projects.first.id : 'p1');
+    final project = appState.projects.firstWhere(
       (p) => p.id == effectiveProjectId,
-      orElse: () => DummyData.projects.first,
+      orElse: () => appState.projects.first,
     );
 
     final confirmed = await showDialog<bool>(
@@ -100,8 +106,8 @@ class _TaskBoardState extends State<TaskBoard> {
     );
 
     if (confirmed == true && mounted) {
-      DummyData.finishProject(effectiveProjectId);
-      setState(() {});
+      await appState.finishProject(effectiveProjectId);
+      if (!mounted) return;
       widget.onTaskAdded?.call();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -114,12 +120,12 @@ class _TaskBoardState extends State<TaskBoard> {
     }
   }
 
-  bool _matchesDueDate(Task task, String filter) {
+  bool _matchesDueDate(ApiTask task, String filter) {
     if (filter == 'All') return true;
     try {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      final parts = task.dueDate.trim().split(' ');
+      final parts = task.formattedDue.trim().split(' ');
       if (parts.length >= 2) {
         const months = {
           'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
@@ -288,7 +294,8 @@ class _TaskBoardState extends State<TaskBoard> {
 
   @override
   Widget build(BuildContext context) {
-    final allTasks = DummyData.getTasksForProject(widget.selectedProjectId);
+    final appState = context.watch<AppState>();
+    final allTasks = appState.tasksForProject(widget.selectedProjectId);
     final tasks = allTasks.where((t) {
       final matchesPriority = _filterPriority == 'All' ||
           t.priority.toLowerCase() == _filterPriority.toLowerCase();
@@ -296,10 +303,10 @@ class _TaskBoardState extends State<TaskBoard> {
       return matchesPriority && matchesDue;
     }).toList();
 
-    final todo = tasks.where((t) => t.status == TaskStatus.assigned).toList();
+    final todo = tasks.where((t) => t.status == 'TO_DO').toList();
     final inProgress =
-        tasks.where((t) => t.status == TaskStatus.inProgress).toList();
-    final done = tasks.where((t) => t.status == TaskStatus.done).toList();
+        tasks.where((t) => t.status == 'IN_PROGRESS').toList();
+    final done = tasks.where((t) => t.status == 'DONE').toList();
     final isFiltered = _filterPriority != 'All' || _filterDueDate != 'All';
 
     return Column(
@@ -400,7 +407,7 @@ class _TaskBoardState extends State<TaskBoard> {
                 const SizedBox(width: 12),
                 // New Task Button
                 ElevatedButton.icon(
-                  onPressed: () => _openAddTask(TaskStatus.assigned),
+                  onPressed: () => _openAddTask('TO_DO'),
                   icon: const Icon(Icons.add, size: 18, color: Colors.white),
                   label: const Text(
                     'New Task',
@@ -434,8 +441,8 @@ class _TaskBoardState extends State<TaskBoard> {
                 'To Do',
                 todo.length,
                 Colors.grey,
-                TaskStatus.assigned,
-                todo.map((t) => _buildTaskCard(t)).toList(),
+                'TO_DO',
+                todo.map((t) => _buildTaskCard(t, appState)).toList(),
               ),
             ),
             const SizedBox(width: 24),
@@ -444,8 +451,8 @@ class _TaskBoardState extends State<TaskBoard> {
                 'In Progress',
                 inProgress.length,
                 const Color(0xFF2563EB),
-                TaskStatus.inProgress,
-                inProgress.map((t) => _buildTaskCard(t)).toList(),
+                'IN_PROGRESS',
+                inProgress.map((t) => _buildTaskCard(t, appState)).toList(),
               ),
             ),
             const SizedBox(width: 24),
@@ -454,8 +461,8 @@ class _TaskBoardState extends State<TaskBoard> {
                 'Done',
                 done.length,
                 Colors.green,
-                TaskStatus.done,
-                done.map((t) => _buildTaskCard(t)).toList(),
+                'DONE',
+                done.map((t) => _buildTaskCard(t, appState)).toList(),
               ),
             ),
           ],
@@ -468,7 +475,7 @@ class _TaskBoardState extends State<TaskBoard> {
     String title,
     int count,
     Color dotColor,
-    TaskStatus status,
+    String status,
     List<Widget> taskWidgets,
   ) {
     return Container(
@@ -561,7 +568,7 @@ class _TaskBoardState extends State<TaskBoard> {
     );
   }
 
-  Widget _buildTaskCard(Task task) {
+  Widget _buildTaskCard(ApiTask task, AppState appState) {
     Color priorityColor;
     Color priorityBg;
     switch (task.priority) {
@@ -579,17 +586,17 @@ class _TaskBoardState extends State<TaskBoard> {
     }
 
     // Find assigned member if any
-    TeamMember? assignee;
+    ApiUser? assignee;
     try {
-      assignee = DummyData.members.firstWhere(
-        (m) => m.id == task.assigneeId || m.tasks.any((t) => t.id == task.id),
-      );
+      if (task.assigneeId != null) {
+        assignee = appState.users.firstWhere((m) => m.id == task.assigneeId);
+      }
     } catch (_) {
       assignee = null;
     }
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -597,7 +604,7 @@ class _TaskBoardState extends State<TaskBoard> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.01),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -609,20 +616,27 @@ class _TaskBoardState extends State<TaskBoard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: task.tagColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  task.tag,
-                  style: TextStyle(
-                    color: task.tagColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: task.tags.map((tag) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: tag.parsedColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        tag.name,
+                        style: TextStyle(
+                          color: tag.parsedColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
               Container(
@@ -674,7 +688,7 @@ class _TaskBoardState extends State<TaskBoard> {
                   ),
                   const SizedBox(width: 5),
                   Text(
-                    task.dueDate,
+                    task.formattedDue,
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -688,9 +702,9 @@ class _TaskBoardState extends State<TaskBoard> {
                       message: assignee.name,
                       child: CircleAvatar(
                         radius: 12,
-                        backgroundImage: NetworkImage(assignee.avatarUrl),
+                        backgroundImage: assignee.avatarUrl != null ? NetworkImage(assignee.avatarUrl!) : null,
                         backgroundColor:
-                            assignee.avatarColor.withValues(alpha: 0.2),
+                            assignee.color.withValues(alpha: 0.2),
                       ),
                     )
                   : Tooltip(

@@ -1,25 +1,27 @@
 import 'package:flutter/material.dart';
-import '../data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import '../services/app_state.dart';
+import '../services/api_service.dart';
 
 class AddTaskDialog extends StatefulWidget {
   const AddTaskDialog({
     super.key,
     required this.projectId,
-    this.initialStatus = TaskStatus.assigned,
+    this.initialStatus = 'TO_DO',
     this.onTaskAdded,
   });
 
   final String projectId;
-  final TaskStatus initialStatus;
-  final void Function(Task task)? onTaskAdded;
+  final String initialStatus;
+  final void Function(ApiTask task)? onTaskAdded;
 
-  static Future<Task?> show(
+  static Future<ApiTask?> show(
     BuildContext context, {
     required String projectId,
-    TaskStatus initialStatus = TaskStatus.assigned,
-    void Function(Task task)? onTaskAdded,
+    String initialStatus = 'TO_DO',
+    void Function(ApiTask task)? onTaskAdded,
   }) {
-    return showDialog<Task>(
+    return showDialog<ApiTask>(
       context: context,
       builder: (ctx) => AddTaskDialog(
         projectId: projectId,
@@ -37,21 +39,11 @@ class _AddTaskDialogState extends State<AddTaskDialog> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
 
-  late TaskStatus _selectedStatus;
+  late String _selectedStatus;
   String _selectedPriority = 'Medium';
-  String _selectedTag = 'Dev';
-  Color _selectedTagColor = Colors.blue;
+  final List<String> _selectedTagIds = [];
   String _dueDate = 'Sep 15';
   DateTime _dueDateObject = DateTime.now().add(const Duration(days: 3));
-
-  final List<Map<String, dynamic>> _tags = [
-    {'label': 'Dev', 'color': const Color(0xFF2563EB)},
-    {'label': 'Design', 'color': const Color(0xFF7C3AED)},
-    {'label': 'Bug', 'color': const Color(0xFFEA580C)},
-    {'label': 'Marketing', 'color': const Color(0xFF4F46E5)},
-    {'label': 'QA', 'color': const Color(0xFFDB2777)},
-    {'label': 'Docs', 'color': const Color(0xFF0D9488)},
-  ];
 
   final List<String> _priorities = ['High', 'Medium', 'Low'];
 
@@ -105,7 +97,7 @@ class _AddTaskDialogState extends State<AddTaskDialog> {
     }
   }
 
-  void _submit() {
+  void _submit() async {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -117,25 +109,34 @@ class _AddTaskDialogState extends State<AddTaskDialog> {
       return;
     }
 
-    final newTask = Task(
-      id: 't_${DateTime.now().millisecondsSinceEpoch}',
-      title: title,
-      description: _descController.text.trim(),
-      tag: _selectedTag,
-      tagColor: _selectedTagColor,
-      priority: _selectedPriority,
-      dueDate: _dueDate,
-      projectId: widget.projectId,
-      status: _selectedStatus,
-      progress: _selectedStatus == TaskStatus.inProgress
-          ? 0.3
-          : (_selectedStatus == TaskStatus.done ? 1.0 : 0.0),
-    );
+    try {
+      // Create task via AppState
+      await context.read<AppState>().createTask(
+        title: title,
+        description: _descController.text.trim(),
+        tagIds: _selectedTagIds,
+        priority: _selectedPriority,
+        dueDate: _dueDateObject.toIso8601String(),
+        projectId: widget.projectId,
+        status: _selectedStatus,
+      );
 
-    DummyData.addTask(newTask);
-
-    widget.onTaskAdded?.call(newTask);
-    Navigator.of(context).pop(newTask);
+      widget.onTaskAdded?.call(ApiTask(
+        id: '', title: '', description: '', status: '', tags: [], priority: '', projectId: '',
+      ));
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error creating task: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   InputDecoration _inputDec(String hint) => InputDecoration(
@@ -411,22 +412,22 @@ class _AddTaskDialogState extends State<AddTaskDialog> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        DropdownButtonFormField<TaskStatus>(
+                        DropdownButtonFormField<String>(
                           initialValue: _selectedStatus,
                           decoration: _inputDec('Status'),
                           items: const [
                             DropdownMenuItem(
-                              value: TaskStatus.assigned,
+                              value: 'TO_DO',
                               child:
                                   Text('To Do', style: TextStyle(fontSize: 13)),
                             ),
                             DropdownMenuItem(
-                              value: TaskStatus.inProgress,
+                              value: 'IN_PROGRESS',
                               child: Text('In Progress',
                                   style: TextStyle(fontSize: 13)),
                             ),
                             DropdownMenuItem(
-                              value: TaskStatus.done,
+                              value: 'DONE',
                               child:
                                   Text('Done', style: TextStyle(fontSize: 13)),
                             ),
@@ -459,13 +460,16 @@ class _AddTaskDialogState extends State<AddTaskDialog> {
                         Wrap(
                           spacing: 6,
                           runSpacing: 6,
-                          children: _tags.map((t) {
-                            final isSel = _selectedTag == t['label'];
-                            final Color color = t['color'] as Color;
+                          children: context.watch<AppState>().tags.map((t) {
+                            final isSel = _selectedTagIds.contains(t.id);
+                            final color = t.parsedColor;
                             return GestureDetector(
                               onTap: () => setState(() {
-                                _selectedTag = t['label'] as String;
-                                _selectedTagColor = color;
+                                if (isSel) {
+                                  _selectedTagIds.remove(t.id);
+                                } else {
+                                  _selectedTagIds.add(t.id);
+                                }
                               }),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
@@ -483,7 +487,7 @@ class _AddTaskDialogState extends State<AddTaskDialog> {
                                   ),
                                 ),
                                 child: Text(
-                                  t['label'] as String,
+                                  t.name,
                                   style: TextStyle(
                                     color: isSel
                                         ? color
