@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../../core/data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import '../../../../core/services/app_state.dart';
 
 class StatsRow extends StatelessWidget {
   const StatsRow({super.key, this.selectedProjectId});
@@ -8,27 +9,32 @@ class StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tasks = DummyData.getTasksForProject(selectedProjectId);
+    final appState = context.watch<AppState>();
+    final tasks = appState.tasksForProject(selectedProjectId);
     final total = tasks.length;
-    final inProgress = tasks.where((t) => t.status == TaskStatus.inProgress).length;
-    final urgent = tasks.where((t) => t.priority == 'High').length;
+    final inProgress = tasks.where((t) => t.status == 'IN_PROGRESS').length;
+    final done = tasks.where((t) => t.status == 'DONE').length;
+    final urgent = tasks.where((t) => t.priority == 'High' && t.status != 'DONE').length;
+
+    final assignedCount = tasks.where((t) => t.assigneeId != null).length;
+    final teamLoad = total == 0 ? 0 : ((assignedCount / total) * 100).round();
 
     return Row(
       children: [
         Expanded(
-          child: _buildStatCard('Total Tasks', total.toString(), '+12% 4 completed today', Icons.check_circle_outline, Colors.green),
+          child: _buildStatCard('Total Tasks', total.toString(), '$done completed', Icons.check_circle_outline, Colors.green),
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: _buildStatCard('In Progress', inProgress.toString(), '0% 2 overdue', Icons.schedule, Colors.grey),
+          child: _buildStatCard('In Progress', inProgress.toString(), 'Active tasks', Icons.schedule, Colors.grey),
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: _buildStatCard('Team Load', '85%', '+5% Capacity reached', Icons.trending_up, Colors.green),
+          child: _buildStatCard('Team Load', '$teamLoad%', '$assignedCount assigned', Icons.trending_up, Colors.green),
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: _buildStatCard('Urgent', urgent.toString(), '-1 Needs attention', Icons.warning_amber_rounded, Colors.red),
+          child: _buildStatCard('Urgent', urgent.toString(), 'High priority tasks', Icons.warning_amber_rounded, Colors.red),
         ),
       ],
     );

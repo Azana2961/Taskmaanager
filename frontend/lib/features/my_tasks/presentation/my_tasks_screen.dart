@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/widgets/header.dart';
 import '../../../core/widgets/sidebar.dart';
-import '../../../core/data/dummy_data.dart' as data;
+import '../../../core/services/app_state.dart';
+import '../../../core/services/api_service.dart';
+
+
 
 class MyTasksScreen extends StatefulWidget {
   const MyTasksScreen({
@@ -22,53 +26,35 @@ class MyTasksScreen extends StatefulWidget {
 }
 
 class _MyTasksScreenState extends State<MyTasksScreen> {
-  // Tasks sourced from DummyData, filtered by selectedProjectId
-  List<_Task> get _pendingTasks {
-    return data.DummyData.getTasksForProject(widget.selectedProjectId)
-        .where((t) => t.status == data.TaskStatus.assigned)
-        .map((t) => _Task(
-              id: t.id,
-              tag: t.tag,
-              tagColor: t.tagColor,
-              title: t.title,
-              description: t.description,
-              dueDate: t.dueDate,
-              priority: t.priority,
-            ))
+  List<ApiTask> _pendingTasks(AppState appState) {
+    return appState.tasksForProject(widget.selectedProjectId)
+        .where((t) => t.status == 'TO_DO')
         .toList();
   }
 
-  List<_Task> get _runningTasks {
-    return data.DummyData.getTasksForProject(widget.selectedProjectId)
-        .where((t) => t.status == data.TaskStatus.inProgress)
-        .map((t) => _Task(
-              id: t.id,
-              tag: t.tag,
-              tagColor: t.tagColor,
-              title: t.title,
-              description: t.description,
-              dueDate: t.dueDate,
-              priority: t.priority,
-              progress: t.progress ?? 0.1,
-            ))
+  List<ApiTask> _runningTasks(AppState appState) {
+    return appState.tasksForProject(widget.selectedProjectId)
+        .where((t) => t.status == 'IN_PROGRESS')
         .toList();
   }
 
-  void _startTask(_Task task) {
-    data.DummyData.updateTaskStatus(task.id, data.TaskStatus.inProgress);
-    setState(() {});
-    _showSnackbar('Started: "${task.title}" (moved to In Progress)', const Color(0xFF2563EB));
+  void _startTask(ApiTask task) async {
+    await context.read<AppState>().updateTaskStatus(task.id, 'IN_PROGRESS');
+    if (mounted) {
+      _showSnackbar('Started: "${task.title}" (moved to In Progress)', const Color(0xFF2563EB));
+    }
   }
 
-  void _submitTask(_Task task) {
+  void _submitTask(ApiTask task) {
     showDialog(
       context: context,
       builder: (ctx) => _SubmitDialog(
         task: task,
-        onConfirm: () {
-          data.DummyData.updateTaskStatus(task.id, data.TaskStatus.done);
-          setState(() {});
-          _showSnackbar('Task submitted: "${task.title}" (moved to Done) 🎉', Colors.green);
+        onConfirm: () async {
+          await context.read<AppState>().updateTaskStatus(task.id, 'DONE');
+          if (mounted) {
+            _showSnackbar('Task submitted: "${task.title}" (moved to Done) 🎉', Colors.green);
+          }
         },
       ),
     );
@@ -89,6 +75,8 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: Row(
@@ -98,12 +86,12 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
             selectedProjectId: widget.selectedProjectId,
             onNavTap: widget.onNavTap,
             onProjectTap: widget.onProjectTap,
-            onProjectAdded: (p) => setState(() {}),
+            onProjectAdded: (p) {},
           ),
           Expanded(
             child: Column(
               children: [
-                const Header(),
+                Header(selectedProjectId: widget.selectedProjectId),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24),
@@ -115,7 +103,7 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
                         const SizedBox(height: 24),
 
                         // Summary chips
-                        _buildSummaryRow(),
+                        _buildSummaryRow(appState),
                         const SizedBox(height: 32),
 
                         // Two Columns
@@ -124,12 +112,12 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
                           children: [
                             // Pending Tasks Column
                             Expanded(
-                              child: _buildPendingColumn(),
+                              child: _buildPendingColumn(appState),
                             ),
                             const SizedBox(width: 24),
                             // Running Tasks Column
                             Expanded(
-                              child: _buildRunningColumn(),
+                              child: _buildRunningColumn(appState),
                             ),
                           ],
                         ),
@@ -181,19 +169,19 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
     );
   }
 
-  Widget _buildSummaryRow() {
+  Widget _buildSummaryRow(AppState appState) {
     return Row(
       children: [
         _buildChip(
           Icons.hourglass_empty_rounded,
-          '${_pendingTasks.length} Pending',
+          '${_pendingTasks(appState).length} Pending',
           const Color(0xFFFFF7ED),
           const Color(0xFFEA580C),
         ),
         const SizedBox(width: 12),
         _buildChip(
           Icons.bolt_rounded,
-          '${_runningTasks.length} In Progress',
+          '${_runningTasks(appState).length} In Progress',
           const Color(0xFFEFF6FF),
           const Color(0xFF2563EB),
         ),
@@ -225,15 +213,16 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
     );
   }
 
-  Widget _buildPendingColumn() {
+  Widget _buildPendingColumn(AppState appState) {
+    final tasks = _pendingTasks(appState);
     return _TaskColumn(
       title: 'Pending Tasks',
-      count: _pendingTasks.length,
+      count: tasks.length,
       dotColor: const Color(0xFFEA580C),
       headerBadgeColor: const Color(0xFFFFF7ED),
       headerBadgeTextColor: const Color(0xFFEA580C),
       emptyMessage: 'No pending tasks. Great job! 🎉',
-      children: _pendingTasks.map((task) {
+      children: tasks.map((task) {
         return _PendingTaskCard(
           task: task,
           onStart: () => _startTask(task),
@@ -242,15 +231,16 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
     );
   }
 
-  Widget _buildRunningColumn() {
+  Widget _buildRunningColumn(AppState appState) {
+    final tasks = _runningTasks(appState);
     return _TaskColumn(
       title: 'Running Tasks',
-      count: _runningTasks.length,
+      count: tasks.length,
       dotColor: const Color(0xFF2563EB),
       headerBadgeColor: const Color(0xFFEFF6FF),
       headerBadgeTextColor: const Color(0xFF2563EB),
       emptyMessage: 'No tasks in progress yet.',
-      children: _runningTasks.map((task) {
+      children: tasks.map((task) {
         return _RunningTaskCard(
           task: task,
           onSubmit: () => _submitTask(task),
@@ -365,7 +355,7 @@ class _TaskColumn extends StatelessWidget {
 class _PendingTaskCard extends StatelessWidget {
   const _PendingTaskCard({required this.task, required this.onStart});
 
-  final _Task task;
+  final ApiTask task;
   final VoidCallback onStart;
 
   @override
@@ -379,32 +369,40 @@ class _PendingTaskCard extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Tag + Priority Row
+          // Tag + Priority
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: task.tagColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  task.tag,
-                  style: TextStyle(
-                    color: task.tagColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: task.tags.map((tag) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: tag.parsedColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        tag.name,
+                        style: TextStyle(
+                          color: tag.parsedColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
               _PriorityBadge(priority: task.priority),
@@ -441,7 +439,7 @@ class _PendingTaskCard extends StatelessWidget {
                   const Icon(Icons.calendar_today, size: 13, color: Color(0xFF94A3B8)),
                   const SizedBox(width: 4),
                   Text(
-                    'Due: ${task.dueDate}',
+                    'Due: ${task.formattedDue}',
                     style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                   ),
                 ],
@@ -476,7 +474,7 @@ class _PendingTaskCard extends StatelessWidget {
 class _RunningTaskCard extends StatelessWidget {
   const _RunningTaskCard({required this.task, required this.onSubmit});
 
-  final _Task task;
+  final ApiTask task;
   final VoidCallback onSubmit;
 
   @override
@@ -487,10 +485,10 @@ class _RunningTaskCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.25)),
+        border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.25)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2563EB).withOpacity(0.04),
+            color: const Color(0xFF2563EB).withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -503,23 +501,29 @@ class _RunningTaskCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: task.tagColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      task.tag,
-                      style: TextStyle(
-                        color: task.tagColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+              Expanded(
+                child: Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                  children: task.tags.map((tag) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: tag.parsedColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                    ),
-                  ),
+                      child: Text(
+                        tag.name,
+                        style: TextStyle(
+                          color: tag.parsedColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -542,8 +546,6 @@ class _RunningTaskCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                ],
-              ),
               _PriorityBadge(priority: task.priority),
             ],
           ),
@@ -569,33 +571,6 @@ class _RunningTaskCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
 
-          // Progress Bar
-          Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: task.progress ?? 0.0,
-                    backgroundColor: const Color(0xFFE2E8F0),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
-                    minHeight: 6,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                '${((task.progress ?? 0) * 100).round()}%',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2563EB),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
           // Footer: Due date + Submit button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -605,7 +580,7 @@ class _RunningTaskCard extends StatelessWidget {
                   const Icon(Icons.calendar_today, size: 13, color: Color(0xFF94A3B8)),
                   const SizedBox(width: 4),
                   Text(
-                    'Due: ${task.dueDate}',
+                    'Due: ${task.formattedDue}',
                     style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                   ),
                 ],
@@ -677,7 +652,7 @@ class _PriorityBadge extends StatelessWidget {
 // ---------------------------------------------------------------------------
 class _SubmitDialog extends StatelessWidget {
   const _SubmitDialog({required this.task, required this.onConfirm});
-  final _Task task;
+  final ApiTask task;
   final VoidCallback onConfirm;
 
   @override
@@ -706,15 +681,27 @@ class _SubmitDialog extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: task.tagColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    task.tag,
-                    style: TextStyle(color: task.tagColor, fontSize: 12, fontWeight: FontWeight.w600),
+                Expanded(
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: task.tags.map((tag) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: tag.parsedColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          tag.name,
+                          style: TextStyle(
+                            color: tag.parsedColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -747,44 +734,6 @@ class _SubmitDialog extends StatelessWidget {
           child: const Text('Submit Task', style: TextStyle(color: Colors.white)),
         ),
       ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Task Model
-// ---------------------------------------------------------------------------
-class _Task {
-  final String id;
-  final String tag;
-  final Color tagColor;
-  final String title;
-  final String description;
-  final String dueDate;
-  final String priority;
-  final double? progress;
-
-  const _Task({
-    required this.id,
-    required this.tag,
-    required this.tagColor,
-    required this.title,
-    required this.description,
-    required this.dueDate,
-    required this.priority,
-    this.progress,
-  });
-
-  _Task copyWith({double? progress}) {
-    return _Task(
-      id: id,
-      tag: tag,
-      tagColor: tagColor,
-      title: title,
-      description: description,
-      dueDate: dueDate,
-      priority: priority,
-      progress: progress ?? this.progress,
     );
   }
 }

@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'core/data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import 'dart:html' as html;
+import 'core/services/app_state.dart';
+import 'features/auth/presentation/auth_screen.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/my_tasks/presentation/my_tasks_screen.dart';
 import 'features/team/presentation/team_screen.dart';
+import 'features/settings/presentation/settings_screen.dart';
 
 class TaskSyncApp extends StatelessWidget {
   const TaskSyncApp({super.key});
@@ -15,8 +19,8 @@ class TaskSyncApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2563EB), // Sleek blue from mockup
-          surface: const Color(0xFFF8FAFC), // Light gray background
+          seedColor: const Color(0xFF2563EB),
+          surface: const Color(0xFFF8FAFC),
         ),
         textTheme: GoogleFonts.interTextTheme(Theme.of(context).textTheme),
         useMaterial3: true,
@@ -35,13 +39,54 @@ class _AppShell extends StatefulWidget {
 
 class _AppShellState extends State<_AppShell> {
   String _activeItem = 'Dashboard';
-  late String _selectedProjectId;
+  String? _selectedProjectId;
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
-    _selectedProjectId =
-        DummyData.projects.isNotEmpty ? DummyData.projects.first.id : 'p1';
+    _initAuth();
+  }
+
+  void _initAuth() {
+    String? token;
+    final uri = Uri.base;
+
+    // Check localStorage first
+    if (html.window.localStorage.containsKey('auth_token')) {
+      token = html.window.localStorage['auth_token'];
+    }
+
+    // Override if we just returned from OAuth callback
+    if (uri.queryParameters.containsKey('token')) {
+      token = uri.queryParameters['token'];
+      html.window.localStorage['auth_token'] = token!;
+      // Clean up URL
+      html.window.history.replaceState(null, 'TaskSync', uri.path);
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final appState = context.read<AppState>();
+      await appState.checkAuth(token);
+      if (appState.currentUser != null) {
+        if (appState.currentUser!.role == 'Member') {
+          setState(() => _activeItem = 'My Tasks');
+        }
+        await appState.loadAll();
+      }
+      if (mounted) {
+        setState(() => _initialized = true);
+      }
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final appState = context.read<AppState>();
+    if (_selectedProjectId == null && appState.projects.isNotEmpty) {
+      _selectedProjectId = appState.projects.first.id;
+    }
   }
 
   Widget _buildPage() {
@@ -60,6 +105,13 @@ class _AppShellState extends State<_AppShell> {
           onNavTap: _onNavTap,
           onProjectTap: _onProjectTap,
         );
+      case 'Settings':
+        return SettingsScreen(
+          activeItem: _activeItem,
+          selectedProjectId: _selectedProjectId,
+          onNavTap: _onNavTap,
+          onProjectTap: _onProjectTap,
+        );
       default:
         return DashboardScreen(
           activeItem: _activeItem,
@@ -70,18 +122,81 @@ class _AppShellState extends State<_AppShell> {
     }
   }
 
-  void _onNavTap(String item) {
-    setState(() => _activeItem = item);
-  }
+  void _onNavTap(String item) => setState(() => _activeItem = item);
 
   void _onProjectTap(String? projectId) {
-    if (projectId != null) {
-      setState(() => _selectedProjectId = projectId);
-    }
+    if (projectId != null) setState(() => _selectedProjectId = projectId);
   }
 
   @override
   Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
+
+    if (!_initialized || (appState.loading && appState.currentUser != null)) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF8FAFC),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: Color(0xFF2563EB)),
+              SizedBox(height: 16),
+              Text(
+                'Loading TaskSync...',
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (appState.currentUser == null) {
+      // Only show the error banner if it was truly a network/connection error
+      final hasConnectionError = appState.error == 'connection_failed';
+      return AuthScreen(connectionError: hasConnectionError);
+    }
+
+    // Auto-select first project when data arrives
+    if (_selectedProjectId == null && appState.projects.isNotEmpty) {
+      _selectedProjectId = appState.projects.first.id;
+    }
+
+    if (appState.error != null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.wifi_off_rounded, size: 48, color: Color(0xFFDC2626)),
+              const SizedBox(height: 16),
+              const Text(
+                'Cannot connect to backend',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1E293B)),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Make sure the server is running on localhost:5000',
+                style: TextStyle(color: Colors.grey[600], fontSize: 13),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () => context.read<AppState>().loadAll(),
+                icon: const Icon(Icons.refresh, color: Colors.white),
+                label: const Text('Retry', style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return _buildPage();
   }
 }

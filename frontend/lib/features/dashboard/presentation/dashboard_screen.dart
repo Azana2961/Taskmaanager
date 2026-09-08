@@ -46,7 +46,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               children: [
                 // Top Navigation/Search Bar
-                const Header(),
+                Header(selectedProjectId: widget.selectedProjectId),
 
                 // Scrollable Body
                 Expanded(
@@ -73,9 +73,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                             const SizedBox(width: 24),
                             // Right Insights Panel
-                            const Expanded(
+                            Expanded(
                               flex: 1,
-                              child: RightPanel(),
+                              child: RightPanel(selectedProjectId: widget.selectedProjectId),
                             ),
                           ],
                         ),

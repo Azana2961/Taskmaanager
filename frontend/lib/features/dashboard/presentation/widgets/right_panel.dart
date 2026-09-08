@@ -1,10 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../../core/services/app_state.dart';
+import 'dart:math';
 
 class RightPanel extends StatelessWidget {
-  const RightPanel({super.key});
+  final String? selectedProjectId;
+  const RightPanel({super.key, this.selectedProjectId});
 
   @override
   Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
+    final tasks = appState.tasksForProject(selectedProjectId);
+    
+    // Calculate team workload
+    final Map<String, int> workload = {};
+    for (var task in tasks) {
+      if (task.assigneeId != null) {
+        workload[task.assigneeId!] = (workload[task.assigneeId!] ?? 0) + 1;
+      }
+    }
+    
+    final maxTasks = workload.isEmpty ? 1 : workload.values.reduce(max);
+    
+    // Build bars
+    final members = appState.membersForProject(selectedProjectId);
+    final bars = members.take(4).map((member) {
+      final count = workload[member.id] ?? 0;
+      final height = (count / maxTasks) * 120.0;
+      return _buildBar(member.name.split(' ').first, height == 0 ? 4.0 : height, member.color);
+    }).toList();
+
+    if (bars.isEmpty) {
+      bars.add(_buildBar('No team', 4.0, Colors.grey[300]!));
+    }
+
+    // Recent activity (using recently added tasks)
+    final recentTasks = tasks.reversed.take(4).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -40,12 +72,7 @@ class RightPanel extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              _buildBar('Sarah', 60, Colors.grey[300]!),
-              _buildBar('Mike', 120, const Color(0xFF2563EB)),
-              _buildBar('Elena', 50, Colors.grey[300]!),
-              _buildBar('Alex', 80, Colors.grey[300]!),
-            ],
+            children: bars,
           ),
         ),
         
@@ -57,10 +84,18 @@ class RightPanel extends StatelessWidget {
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
         ),
         const SizedBox(height: 16),
-        _buildActivityItem('Elena K.', 'completed Q4 Marketing Plan', '2 hours ago', 'https://i.pravatar.cc/150?img=10'),
-        _buildActivityItem('Mike R.', 'moved Auth Flow to In Progress', '4 hours ago', 'https://i.pravatar.cc/150?img=11'),
-        _buildActivityItem('Sarah J.', 'commented on Landing Page Design', '5 hours ago', 'https://i.pravatar.cc/150?img=12'),
-        _buildActivityItem('Alex T.', 'added tag Mobile Bug', 'Yesterday', 'https://i.pravatar.cc/150?img=13'),
+        if (recentTasks.isEmpty)
+          const Text('No recent activity', style: TextStyle(color: Colors.grey)),
+        ...recentTasks.map((t) {
+          final user = appState.userById(t.assigneeId);
+          return _buildActivityItem(
+            user?.name ?? 'System',
+            'created task "${t.title}"',
+            'recently',
+            user?.avatarUrl ?? 'https://i.pravatar.cc/150?u=${t.id}',
+            user?.color ?? Colors.blue,
+          );
+        }),
       ],
     );
   }
@@ -85,7 +120,7 @@ class RightPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildActivityItem(String name, String action, String time, String avatarUrl) {
+  Widget _buildActivityItem(String name, String action, String time, String avatarUrl, Color avatarColor) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 24.0),
       child: Row(
@@ -93,7 +128,10 @@ class RightPanel extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 16,
-            backgroundImage: NetworkImage(avatarUrl),
+            backgroundColor: avatarColor.withOpacity(0.2),
+            child: avatarUrl.startsWith('http')
+                ? ClipOval(child: Image.network(avatarUrl, width: 32, height: 32, fit: BoxFit.cover, errorBuilder: (_,__,___) => Icon(Icons.person, color: avatarColor, size: 20)))
+                : Icon(Icons.person, color: avatarColor, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(

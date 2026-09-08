@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import '../data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import '../services/app_state.dart';
+import '../services/api_service.dart';
 
 class CreateProjectDialog extends StatefulWidget {
   const CreateProjectDialog({
@@ -7,13 +9,13 @@ class CreateProjectDialog extends StatefulWidget {
     this.onProjectCreated,
   });
 
-  final void Function(Project project)? onProjectCreated;
+  final void Function(ApiProject project)? onProjectCreated;
 
-  static Future<Project?> show(
+  static Future<ApiProject?> show(
     BuildContext context, {
-    void Function(Project project)? onProjectCreated,
+    void Function(ApiProject project)? onProjectCreated,
   }) {
-    return showDialog<Project>(
+    return showDialog<ApiProject>(
       context: context,
       builder: (ctx) => CreateProjectDialog(onProjectCreated: onProjectCreated),
     );
@@ -41,13 +43,20 @@ class _CreateProjectDialogState extends State<CreateProjectDialog> {
   final Set<String> _selectedMemberIds = {};
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_selectedMemberIds.isEmpty) {
+      final appState = context.read<AppState>();
+      if (appState.users.isNotEmpty) {
+        _selectedMemberIds.add(appState.users.first.id);
+      }
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
     _selectedColor = _colors.first;
-    // By default, select all existing members or first member
-    if (DummyData.members.isNotEmpty) {
-      _selectedMemberIds.add(DummyData.members.first.id);
-    }
   }
 
   @override
@@ -68,16 +77,30 @@ class _CreateProjectDialogState extends State<CreateProjectDialog> {
       return;
     }
 
-    final newProject = Project(
-      id: 'p_${DateTime.now().millisecondsSinceEpoch}',
-      name: name,
-      color: _selectedColor,
-      memberIds: _selectedMemberIds.toList(),
-    );
-
-    DummyData.projects.add(newProject);
-    widget.onProjectCreated?.call(newProject);
-    Navigator.of(context).pop(newProject);
+    try {
+      final appState = context.read<AppState>();
+      
+      // It returns immediately with an optimistic project
+      appState.createProject(
+        name: name,
+        colorCode: '#${_selectedColor.value.toRadixString(16).substring(2).toUpperCase()}',
+        memberIds: _selectedMemberIds.toList(),
+      ).then((newProject) {
+        widget.onProjectCreated?.call(newProject);
+        if (mounted) {
+          Navigator.of(context).pop(newProject);
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error creating project: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -242,44 +265,48 @@ class _CreateProjectDialogState extends State<CreateProjectDialog> {
                   borderRadius: BorderRadius.circular(10),
                   color: const Color(0xFFF8FAFC),
                 ),
-                child: Column(
-                  children: DummyData.members.map((m) {
-                    final isChecked = _selectedMemberIds.contains(m.id);
-                    return CheckboxListTile(
-                      value: isChecked,
-                      dense: true,
-                      activeColor: _selectedColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      secondary: CircleAvatar(
-                        radius: 14,
-                        backgroundImage: NetworkImage(m.avatarUrl),
-                        backgroundColor: m.avatarColor.withValues(alpha: 0.2),
-                      ),
-                      title: Text(
-                        m.name,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
-                      subtitle: Text(
-                        m.role,
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                      ),
-                      onChanged: (bool? val) {
-                        setState(() {
-                          if (val == true) {
-                            _selectedMemberIds.add(m.id);
-                          } else {
-                            _selectedMemberIds.remove(m.id);
-                          }
-                        });
-                      },
+                child: Consumer<AppState>(
+                  builder: (context, appState, child) {
+                    return Column(
+                      children: appState.users.map((m) {
+                        final isChecked = _selectedMemberIds.contains(m.id);
+                        return CheckboxListTile(
+                          value: isChecked,
+                          dense: true,
+                          activeColor: _selectedColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          secondary: CircleAvatar(
+                            radius: 14,
+                            backgroundImage: m.avatarUrl != null ? NetworkImage(m.avatarUrl!) : null,
+                            backgroundColor: m.color.withValues(alpha: 0.2),
+                          ),
+                          title: Text(
+                            m.name,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1E293B),
+                            ),
+                          ),
+                          subtitle: Text(
+                            m.role,
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          ),
+                          onChanged: (bool? val) {
+                            setState(() {
+                              if (val == true) {
+                                _selectedMemberIds.add(m.id);
+                              } else {
+                                _selectedMemberIds.remove(m.id);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
                     );
-                  }).toList(),
+                  }
                 ),
               ),
               const SizedBox(height: 28),
