@@ -2,7 +2,7 @@ const projectService = require('./project.service');
 
 const getAll = async (req, res, next) => {
   try {
-    const projects = await projectService.getAllProjects();
+    const projects = await projectService.getAllProjects(req.user.id);
     res.json(projects);
   } catch (err) {
     next(err);

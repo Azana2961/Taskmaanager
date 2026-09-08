@@ -169,6 +169,49 @@ class _TeamScreenState extends State<TeamScreen> {
     );
   }
 
+  void _transferManagerRole(ApiProject project, ApiUser member) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Transfer Manager Role',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+        ),
+        content: Text(
+          'Are you sure you want to transfer the manager role of ${project.name} to ${member.name}? You will become a regular member.',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await context.read<AppState>().transferManagerRole(project.id, member.id);
+              if (mounted) {
+                _showSnackbar(
+                  'Manager role transferred to ${member.name}',
+                  const Color(0xFF059669),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Transfer', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
@@ -476,6 +519,11 @@ class _TeamScreenState extends State<TeamScreen> {
           onRemoveFromProject: project != null
               ? () => _removeMemberFromProject(project, m)
               : null,
+          onTransferManagerRole: project != null &&
+                  appState.isManagerOfProject(project.id) &&
+                  project.ownerId != m.id
+              ? () => _transferManagerRole(project, m)
+              : null,
         );
       }).toList(),
     );
@@ -494,6 +542,7 @@ class _MemberCard extends StatelessWidget {
     required this.appState,
     this.project,
     this.onRemoveFromProject,
+    this.onTransferManagerRole,
   });
 
   final ApiUser member;
@@ -502,6 +551,7 @@ class _MemberCard extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onViewTasks, onAssignTask;
   final VoidCallback? onRemoveFromProject;
+  final VoidCallback? onTransferManagerRole;
 
   Widget _badge(String label, int count, Color bg, Color fg) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -645,6 +695,15 @@ class _MemberCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
           ),
+          if (onTransferManagerRole != null) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: onTransferManagerRole,
+              tooltip: 'Transfer Manager Role',
+              icon: const Icon(Icons.admin_panel_settings_outlined,
+                  size: 18, color: Color(0xFF059669)),
+            ),
+          ],
           if (onRemoveFromProject != null) ...[
             const SizedBox(width: 8),
             IconButton(

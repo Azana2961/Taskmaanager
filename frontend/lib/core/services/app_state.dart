@@ -430,7 +430,30 @@ class AppState extends ChangeNotifier {
   Future<void> removeMemberFromProject(String projectId, String userId) async {
     final updated = await ApiService.removeMemberFromProject(projectId, userId);
     final idx = _projects.indexWhere((p) => p.id == projectId);
+    
+    if (idx != -1) {
+      if (_currentUser != null && _currentUser!.id == userId) {
+        // Current user was removed/left, so they can no longer access this project
+        _projects.removeAt(idx);
+        _tasks.removeWhere((t) => t.projectId == projectId);
+      } else {
+        _projects[idx] = updated;
+      }
+    }
+    notifyListeners();
+  }
+
+  Future<void> transferManagerRole(String projectId, String newOwnerId) async {
+    final updated = await ApiService.updateProject(projectId, {'ownerId': newOwnerId});
+    final idx = _projects.indexWhere((p) => p.id == projectId);
     if (idx != -1) _projects[idx] = updated;
+    notifyListeners();
+  }
+
+  Future<void> deleteProject(String projectId) async {
+    await ApiService.deleteProject(projectId);
+    _projects.removeWhere((p) => p.id == projectId);
+    _tasks.removeWhere((t) => t.projectId == projectId);
     notifyListeners();
   }
 
