@@ -460,7 +460,7 @@ class _AddTaskDialogState extends State<AddTaskDialog> {
                         Wrap(
                           spacing: 6,
                           runSpacing: 6,
-                          children: context.watch<AppState>().tags.map((t) {
+                          children: context.watch<AppState>().tagsForProject(widget.projectId).map((t) {
                             final isSel = _selectedTagIds.contains(t.id);
                             final color = t.parsedColor;
                             return GestureDetector(

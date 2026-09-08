@@ -107,6 +107,18 @@ class _TeamScreenState extends State<TeamScreen> {
             );
           }
         },
+        onInvite: (email) async {
+          try {
+            await context.read<AppState>().inviteUserByEmail(project.id, email);
+            if (mounted) {
+              _showSnackbar('Invitation sent to $email', const Color(0xFF059669));
+            }
+          } catch (e) {
+            if (mounted) {
+              _showSnackbar('Failed to invite user: $e', Colors.red[600]!);
+            }
+          }
+        },
       ),
     );
   }
@@ -179,7 +191,7 @@ class _TeamScreenState extends State<TeamScreen> {
           Expanded(
             child: Column(
               children: [
-                const Header(),
+                Header(selectedProjectId: widget.selectedProjectId),
                 Expanded(
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -921,16 +933,31 @@ class _PanelTaskCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Add Member to Project Dialog
 // ---------------------------------------------------------------------------
-class _AddMemberDialog extends StatelessWidget {
+class _AddMemberDialog extends StatefulWidget {
   const _AddMemberDialog({
     required this.project,
     required this.availableMembers,
     required this.onAdd,
+    required this.onInvite,
   });
 
   final ApiProject project;
   final List<ApiUser> availableMembers;
   final void Function(ApiUser) onAdd;
+  final void Function(String) onInvite;
+
+  @override
+  State<_AddMemberDialog> createState() => _AddMemberDialogState();
+}
+
+class _AddMemberDialogState extends State<_AddMemberDialog> {
+  final _emailController = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => Dialog(
@@ -947,12 +974,12 @@ class _AddMemberDialog extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: project.color.withValues(alpha: 0.12),
+                      color: widget.project.color.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
                       Icons.person_add_outlined,
-                      color: project.color,
+                      color: widget.project.color,
                       size: 20,
                     ),
                   ),
@@ -970,7 +997,7 @@ class _AddMemberDialog extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'To ${project.name}',
+                          'To ${widget.project.name}',
                           style: const TextStyle(
                             fontSize: 13,
                             color: Color(0xFF64748B),
@@ -985,10 +1012,48 @@ class _AddMemberDialog extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+              // Invite by Email section
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _emailController,
+                      decoration: InputDecoration(
+                        hintText: 'Invite by email...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (_emailController.text.trim().isNotEmpty) {
+                        widget.onInvite(_emailController.text.trim());
+                        Navigator.of(context).pop();
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: widget.project.color,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text('Invite', style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
               const Divider(color: Color(0xFFE2E8F0)),
               const SizedBox(height: 16),
-              ...availableMembers.map(
+              const Text('Add existing member:', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+              const SizedBox(height: 8),
+              if (widget.availableMembers.isEmpty)
+                const Text('No more existing members available to add.', style: TextStyle(color: Colors.grey)),
+              ...widget.availableMembers.map(
                 (m) => Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   child: Material(
@@ -997,7 +1062,7 @@ class _AddMemberDialog extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                       onTap: () {
                         Navigator.of(context).pop();
-                        onAdd(m);
+                        widget.onAdd(m);
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -1040,7 +1105,7 @@ class _AddMemberDialog extends StatelessWidget {
                             ),
                             Icon(
                               Icons.add_circle_outline,
-                              color: project.color,
+                              color: widget.project.color,
                               size: 22,
                             ),
                           ],

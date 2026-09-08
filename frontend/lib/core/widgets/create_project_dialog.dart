@@ -65,7 +65,7 @@ class _CreateProjectDialogState extends State<CreateProjectDialog> {
     super.dispose();
   }
 
-  void _submit() async {
+  void _submit() {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -78,16 +78,19 @@ class _CreateProjectDialogState extends State<CreateProjectDialog> {
     }
 
     try {
-      final newProject = await context.read<AppState>().createProject(
+      final appState = context.read<AppState>();
+      
+      // It returns immediately with an optimistic project
+      appState.createProject(
         name: name,
         colorCode: '#${_selectedColor.value.toRadixString(16).substring(2).toUpperCase()}',
         memberIds: _selectedMemberIds.toList(),
-      );
-
-      widget.onProjectCreated?.call(newProject);
-      if (mounted) {
-        Navigator.of(context).pop(newProject);
-      }
+      ).then((newProject) {
+        widget.onProjectCreated?.call(newProject);
+        if (mounted) {
+          Navigator.of(context).pop(newProject);
+        }
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

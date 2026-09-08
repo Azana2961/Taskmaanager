@@ -3,6 +3,16 @@ const prisma = require('../../config/db');
 exports.getAll = async (req, res, next) => {
   try {
     const tags = await prisma.tag.findMany({
+      where: {
+        OR: [
+          {
+            project: {
+              members: { some: { id: req.user.userId } } // NOTE: in other controllers, it's req.user.userId
+            }
+          },
+          { projectId: null } // allow global tags if any exist
+        ]
+      },
       orderBy: { createdAt: 'asc' },
     });
     res.json(tags);
@@ -13,9 +23,9 @@ exports.getAll = async (req, res, next) => {
 
 exports.create = async (req, res, next) => {
   try {
-    const { name, color } = req.body;
+    const { name, color, projectId } = req.body;
     const tag = await prisma.tag.create({
-      data: { name, color },
+      data: { name, color, projectId },
     });
     res.status(201).json(tag);
   } catch (error) {

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:html' as html;
 import 'api_service.dart';
+import 'package:uuid/uuid.dart';
 
 /// Central state for the TaskSync app.
 /// All screens consume this via Provider / context.watch<AppState>().
@@ -10,9 +12,12 @@ class AppState extends ChangeNotifier {
   List<ApiTask> _tasks = [];
   List<ApiTag> _tags = [];
   ApiStats _stats = ApiStats(total: 0, todo: 0, inProgress: 0, done: 0);
+  List<ProjectInvitation> _invitations = [];
 
   bool _loading = true;
   String? _error;
+  ApiUser? _currentUser;
+  List<ProjectInvitation> _pendingInvitations = [];
 
   // ── Public getters ────────────────────────────────────────────────────────
   List<ApiProject> get projects => _projects;
@@ -22,6 +27,26 @@ class AppState extends ChangeNotifier {
   ApiStats get stats => _stats;
   bool get loading => _loading;
   String? get error => _error;
+  ApiUser? get currentUser => _currentUser;
+  List<ProjectInvitation> get pendingInvitations => _pendingInvitations;
+  List<ProjectInvitation> get invitations => _invitations;
+
+  /// Checks if the current user is the owner (manager) of the given project ID
+  bool isManagerOfProject(String? projectId) {
+    if (projectId == null || _currentUser == null) return false;
+    try {
+      final project = _projects.firstWhere((p) => p.id == projectId);
+      return project.ownerId == _currentUser!.id;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Checks if the current user owns *any* project (e.g. for global permissions like Tags)
+  bool get isManagerOfAnyProject {
+    if (_currentUser == null) return false;
+    return _projects.any((p) => p.ownerId == _currentUser!.id);
+  }
 
   // ── Filtered helpers ──────────────────────────────────────────────────────
 
@@ -39,6 +64,11 @@ class AppState extends ChangeNotifier {
     } catch (_) {
       return [];
     }
+  }
+
+  List<ApiTag> tagsForProject(String? projectId) {
+    if (projectId == null) return [];
+    return _tags.where((t) => t.projectId == projectId || t.projectId == null).toList();
   }
 
   ApiProject? projectById(String? id) {
@@ -61,7 +91,55 @@ class AppState extends ChangeNotifier {
 
   // ── Boot load ─────────────────────────────────────────────────────────────
 
-  Future<void> loadAll() async {
+  Future<void> checkAuth(String? token) async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      if (token != null) ApiService.setToken(token);
+      _currentUser = await ApiService.checkAuth();
+      // If null is returned with a token, the token is invalid — clear it
+      if (_currentUser == null && token != null) {
+        html.window.localStorage.remove('auth_token');
+        ApiService.clearToken();
+      }
+    } catch (e) {
+      // Only surface the error if it's a real connectivity issue
+      if (_isConnectionError(e)) {
+        _error = 'connection_failed';
+      }
+      // For 401/other HTTP errors: user is simply not logged in — no error shown
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> logout() async {
+    await ApiService.logout();
+    _currentUser = null;
+    html.window.localStorage.remove('auth_token');
+    notifyListeners();
+  }
+
+  Future<void> updateUserName(String newName) async {
+    if (_currentUser == null) return;
+    try {
+      final updatedUser = await ApiService.updateUser(_currentUser!.id, newName);
+      _currentUser = updatedUser;
+      
+      // Update user in the _users list if present
+      final idx = _users.indexWhere((u) => u.id == _currentUser!.id);
+      if (idx != -1) {
+        _users[idx] = updatedUser;
+      }
+      notifyListeners();
+    } catch (e) {
+      print('Failed to update name: $e');
+    }
+  }
+
+  Future<void> loadAll({int attempt = 0}) async {
     _loading = true;
     _error = null;
     notifyListeners();
@@ -72,19 +150,71 @@ class AppState extends ChangeNotifier {
         ApiService.getTasks(),
         ApiService.getStats(),
         ApiService.getTags(),
+        ApiService.getMyInvitations(),
       ]);
       _projects = results[0] as List<ApiProject>;
       _users = results[1] as List<ApiUser>;
       _tasks = results[2] as List<ApiTask>;
       _stats = results[3] as ApiStats;
       _tags = results[4] as List<ApiTag>;
+      _invitations = results[5] as List<ProjectInvitation>;
+      _pendingInvitations = _invitations.where((i) => i.status == 'PENDING').toList();
       _error = null;
     } catch (e) {
+      if (_isConnectionError(e) && attempt < 3) {
+        // Auto-retry with backoff: 1s, 2s, 3s
+        await Future.delayed(Duration(seconds: attempt + 1));
+        return loadAll(attempt: attempt + 1);
+      }
       _error = e.toString();
     } finally {
       _loading = false;
       notifyListeners();
     }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  bool _isConnectionError(Object e) {
+    final msg = e.toString().toLowerCase();
+    return msg.contains('failed host lookup') ||
+        msg.contains('connection refused') ||
+        msg.contains('socketexception') ||
+        msg.contains('network is unreachable') ||
+        msg.contains('connection timed out') ||
+        msg.contains('xmlhttprequest error') ||
+        msg.contains('os error');
+  }
+
+  /// Re-fetches the current user from /auth/me to pick up role changes.
+  Future<void> refreshUserRole() async {
+    try {
+      _currentUser = await ApiService.checkAuth();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  // ── Invitation actions ────────────────────────────────────────────────────
+
+  Future<void> acceptInvitation(String id) async {
+    await ApiService.respondInvitation(id, 'ACCEPTED');
+    _invitations = _invitations.map((i) => i.id == id
+        ? ProjectInvitation(id: i.id, projectId: i.projectId, projectName: i.projectName,
+            inviterId: i.inviterId, inviterName: i.inviterName, status: 'ACCEPTED', createdAt: i.createdAt)
+        : i).toList();
+    _pendingInvitations.removeWhere((i) => i.id == id);
+    // Reload data to get the new project
+    await loadAll();
+  }
+
+  Future<void> declineInvitation(String id) async {
+    await ApiService.respondInvitation(id, 'DECLINED');
+    _invitations = _invitations.map((i) => i.id == id
+        ? ProjectInvitation(id: i.id, projectId: i.projectId, projectName: i.projectName,
+            inviterId: i.inviterId, inviterName: i.inviterName, status: 'DECLINED', createdAt: i.createdAt)
+        : i).toList();
+    _pendingInvitations.removeWhere((i) => i.id == id);
+    notifyListeners();
   }
 
   // ── Task mutations ────────────────────────────────────────────────────────
@@ -215,8 +345,8 @@ class AppState extends ChangeNotifier {
 
   // ── Tag mutations ─────────────────────────────────────────────────────────
 
-  Future<void> createTag({required String name, required String color}) async {
-    final tag = await ApiService.createTag(name: name, color: color);
+  Future<void> createTag({required String name, required String color, required String projectId}) async {
+    final tag = await ApiService.createTag(name: name, color: color, projectId: projectId);
     _tags.add(tag);
     notifyListeners();
   }
@@ -243,14 +373,51 @@ class AppState extends ChangeNotifier {
     required String colorCode,
     required List<String> memberIds,
   }) async {
-    final project = await ApiService.createProject(
+    const uuid = Uuid();
+    final realId = uuid.v4();
+    
+    // Find the current user and selected members for optimistic rendering
+    final members = _users.where((u) => memberIds.contains(u.id) || u.id == _currentUser?.id).toSet().toList();
+    
+    final optimisticProject = ApiProject(
+      id: realId,
+      name: name,
+      colorCode: colorCode,
+      ownerId: _currentUser?.id,
+      members: members,
+      tasks: [],
+    );
+    
+    _projects.add(optimisticProject);
+    notifyListeners();
+
+    // Background sync
+    ApiService.createProject(
+      id: realId,
       name: name,
       colorCode: colorCode,
       memberIds: memberIds,
-    );
-    _projects.add(project);
-    notifyListeners();
-    return project;
+    ).then((savedProject) {
+      final idx = _projects.indexWhere((p) => p.id == realId);
+      if (idx != -1) {
+        _projects[idx] = savedProject;
+        // Update selectedProjectId in UI if necessary by notifying listeners again
+        notifyListeners();
+      }
+    }).catchError((_) {
+      _projects.removeWhere((p) => p.id == realId);
+      notifyListeners();
+    });
+
+    return optimisticProject;
+  }
+
+  Future<void> sendInvitation({required String projectId, required String inviteeId}) async {
+    await ApiService.sendInvitation(projectId: projectId, inviteeId: inviteeId);
+  }
+
+  Future<void> inviteUserByEmail(String projectId, String email) async {
+    await ApiService.sendInvitationByEmail(projectId, email);
   }
 
   Future<void> addMemberToProject(String projectId, String userId) async {

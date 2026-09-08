@@ -14,13 +14,15 @@ class ApiTag {
   final String id;
   final String name;
   final String color;
+  final String? projectId;
 
-  ApiTag({required this.id, required this.name, required this.color});
+  ApiTag({required this.id, required this.name, required this.color, this.projectId});
 
   factory ApiTag.fromJson(Map<String, dynamic> json) => ApiTag(
         id: json['id'] as String,
         name: json['name'] as String,
         color: json['color'] as String,
+        projectId: json['projectId'] as String?,
       );
 
   Color get parsedColor {
@@ -140,6 +142,7 @@ class ApiProject {
   final String id;
   final String name;
   final String? colorCode;
+  final String? ownerId;
   final List<ApiUser> members;
   final List<ApiTask> tasks;
 
@@ -147,6 +150,7 @@ class ApiProject {
     required this.id,
     required this.name,
     this.colorCode,
+    this.ownerId,
     required this.members,
     required this.tasks,
   });
@@ -155,6 +159,7 @@ class ApiProject {
         id: j['id'] as String,
         name: j['name'] as String,
         colorCode: j['colorCode'] as String?,
+        ownerId: j['ownerId'] as String?,
         members: (j['members'] as List<dynamic>?)
                 ?.map((m) => ApiUser.fromJson(m as Map<String, dynamic>))
                 .toList() ??
@@ -197,31 +202,98 @@ class ApiStats {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Project Invitation Model
+// ─────────────────────────────────────────────────────────────────────────────
+
+class ProjectInvitation {
+  final String id;
+  final String projectId;
+  final String projectName;
+  final String inviterId;
+  final String inviterName;
+  final String status; // PENDING | ACCEPTED | DECLINED
+  final DateTime createdAt;
+
+  ProjectInvitation({
+    required this.id,
+    required this.projectId,
+    required this.projectName,
+    required this.inviterId,
+    required this.inviterName,
+    required this.status,
+    required this.createdAt,
+  });
+
+  factory ProjectInvitation.fromJson(Map<String, dynamic> j) => ProjectInvitation(
+        id: j['id'] as String,
+        projectId: j['projectId'] as String,
+        projectName: (j['project'] as Map<String, dynamic>?)?['name'] as String? ?? '',
+        inviterId: j['inviterId'] as String,
+        inviterName: (j['inviter'] as Map<String, dynamic>?)?['name'] as String? ?? 'Manager',
+        status: j['status'] as String,
+        createdAt: DateTime.parse(j['createdAt'] as String),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // API Service
 // ─────────────────────────────────────────────────────────────────────────────
 
 class ApiService {
   static final _client = http.Client();
+  static String? _token;
+
+  static void setToken(String token) => _token = token;
+  static void clearToken() => _token = null;
 
   static Map<String, String> get _headers => {
         'Content-Type': 'application/json',
+        if (_token != null) 'Authorization': 'Bearer $_token',
       };
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Auth
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  static Future<ApiUser?> checkAuth() async {
+    if (_token == null) return null;
+    final res = await _client.get(Uri.parse('$_baseUrl/auth/me'), headers: _headers);
+    if (res.statusCode == 200) {
+      return ApiUser.fromJson(jsonDecode(res.body));
+    }
+    return null;
+  }
+
+  static Future<void> logout() async {
+    await _client.post(Uri.parse('$_baseUrl/auth/logout'), headers: _headers);
+    _token = null;
+  }
+
+  static Future<ApiUser> updateUser(String id, String name) async {
+    final res = await _client.put(
+      Uri.parse('$_baseUrl/users/$id'),
+      headers: _headers,
+      body: jsonEncode({'name': name}),
+    );
+    _check(res);
+    return ApiUser.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
 
   // ── Tags ──────────────────────────────────────────────────────────────────
 
   static Future<List<ApiTag>> getTags() async {
-    final res = await _client.get(Uri.parse('$_baseUrl/tags'));
+    final res = await _client.get(Uri.parse('$_baseUrl/tags'), headers: _headers);
     _check(res);
     return (jsonDecode(res.body) as List)
         .map((j) => ApiTag.fromJson(j as Map<String, dynamic>))
         .toList();
   }
 
-  static Future<ApiTag> createTag({required String name, required String color}) async {
+  static Future<ApiTag> createTag({required String name, required String color, required String projectId}) async {
     final res = await _client.post(
       Uri.parse('$_baseUrl/tags'),
       headers: _headers,
-      body: jsonEncode({'name': name, 'color': color}),
+      body: jsonEncode({'name': name, 'color': color, 'projectId': projectId}),
     );
     _check(res);
     return ApiTag.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
@@ -238,14 +310,14 @@ class ApiService {
   }
 
   static Future<void> deleteTag(String id) async {
-    final res = await _client.delete(Uri.parse('$_baseUrl/tags/$id'));
+    final res = await _client.delete(Uri.parse('$_baseUrl/tags/$id'), headers: _headers);
     _check(res);
   }
 
   // ── Users ─────────────────────────────────────────────────────────────────
 
   static Future<List<ApiUser>> getUsers() async {
-    final res = await _client.get(Uri.parse('$_baseUrl/users'));
+    final res = await _client.get(Uri.parse('$_baseUrl/users'), headers: _headers);
     _check(res);
     return (jsonDecode(res.body) as List)
         .map((j) => ApiUser.fromJson(j as Map<String, dynamic>))
@@ -255,7 +327,7 @@ class ApiService {
   // ── Projects ──────────────────────────────────────────────────────────────
 
   static Future<List<ApiProject>> getProjects() async {
-    final res = await _client.get(Uri.parse('$_baseUrl/projects'));
+    final res = await _client.get(Uri.parse('$_baseUrl/projects'), headers: _headers);
     _check(res);
     return (jsonDecode(res.body) as List)
         .map((j) => ApiProject.fromJson(j as Map<String, dynamic>))
@@ -263,6 +335,7 @@ class ApiService {
   }
 
   static Future<ApiProject> createProject({
+    required String id,
     required String name,
     required String colorCode,
     required List<String> memberIds,
@@ -270,7 +343,7 @@ class ApiService {
     final res = await _client.post(
       Uri.parse('$_baseUrl/projects'),
       headers: _headers,
-      body: jsonEncode({'name': name, 'colorCode': colorCode, 'memberIds': memberIds}),
+      body: jsonEncode({'id': id, 'name': name, 'colorCode': colorCode, 'memberIds': memberIds}),
     );
     _check(res);
     return ApiProject.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
@@ -310,7 +383,7 @@ class ApiService {
     final uri = projectId != null
         ? Uri.parse('$_baseUrl/tasks?projectId=$projectId')
         : Uri.parse('$_baseUrl/tasks');
-    final res = await _client.get(uri);
+    final res = await _client.get(uri, headers: _headers);
     _check(res);
     return (jsonDecode(res.body) as List)
         .map((j) => ApiTask.fromJson(j as Map<String, dynamic>))
@@ -371,7 +444,7 @@ class ApiService {
     final uri = projectId != null
         ? Uri.parse('$_baseUrl/stats?projectId=$projectId')
         : Uri.parse('$_baseUrl/stats');
-    final res = await _client.get(uri);
+    final res = await _client.get(uri, headers: _headers);
     _check(res);
     return ApiStats.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
@@ -382,5 +455,43 @@ class ApiService {
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('API error ${res.statusCode}: ${res.body}');
     }
+  }
+
+  // ── Invitations ───────────────────────────────────────────────────────────
+
+  static Future<List<ProjectInvitation>> getMyInvitations() async {
+    final res = await _client.get(Uri.parse('$_baseUrl/invitations/mine'), headers: _headers);
+    if (res.statusCode == 404) return []; // route not set up yet
+    _check(res);
+    return (jsonDecode(res.body) as List)
+        .map((j) => ProjectInvitation.fromJson(j as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<void> sendInvitation({required String projectId, required String inviteeId}) async {
+    final res = await _client.post(
+      Uri.parse('$_baseUrl/invitations'),
+      headers: _headers,
+      body: jsonEncode({'projectId': projectId, 'inviteeId': inviteeId}),
+    );
+    _check(res);
+  }
+
+  static Future<void> sendInvitationByEmail(String projectId, String email) async {
+    final res = await _client.post(
+      Uri.parse('$_baseUrl/invitations'),
+      headers: _headers,
+      body: jsonEncode({'projectId': projectId, 'email': email}),
+    );
+    _check(res);
+  }
+
+  static Future<void> respondInvitation(String id, String status) async {
+    final res = await _client.patch(
+      Uri.parse('$_baseUrl/invitations/$id'),
+      headers: _headers,
+      body: jsonEncode({'status': status}),
+    );
+    _check(res);
   }
 }

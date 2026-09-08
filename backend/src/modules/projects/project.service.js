@@ -26,16 +26,24 @@ const getProjectById = async (id) => {
 /**
  * Create a new project and optionally assign initial members
  */
-const createProject = async ({ name, colorCode, memberIds = [] }) => {
-  return prisma.project.create({
-    data: {
-      name,
-      colorCode: colorCode || '#2563EB',
-      members: memberIds.length
-        ? { connect: memberIds.map((id) => ({ id })) }
-        : undefined,
-    },
-    include,
+const createProject = async ({ id, name, colorCode, memberIds = [], creatorId }) => {
+  const finalMemberIds = Array.from(new Set([...memberIds, creatorId]));
+  
+  return prisma.$transaction(async (tx) => {
+    const project = await tx.project.create({
+      data: {
+        id,
+        name,
+        colorCode: colorCode || '#2563EB',
+        ownerId: creatorId,
+        members: { connect: finalMemberIds.map((id) => ({ id })) },
+      },
+      include,
+    });
+    return project;
+  }, {
+    maxWait: 10000,
+    timeout: 20000,
   });
 };
 

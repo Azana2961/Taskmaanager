@@ -21,9 +21,10 @@ const getById = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
-    const { name, colorCode, memberIds } = req.body;
+    const { id, name, colorCode, memberIds } = req.body;
     if (!name) return res.status(400).json({ error: 'name is required' });
-    const project = await projectService.createProject({ name, colorCode, memberIds });
+    const creatorId = req.user.id;
+    const project = await projectService.createProject({ id, name, colorCode, memberIds, creatorId });
     res.status(201).json(project);
   } catch (err) {
     next(err);

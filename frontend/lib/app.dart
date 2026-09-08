@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'dart:html' as html;
 import 'core/services/app_state.dart';
+import 'features/auth/presentation/auth_screen.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/my_tasks/presentation/my_tasks_screen.dart';
 import 'features/team/presentation/team_screen.dart';
@@ -38,11 +40,49 @@ class _AppShell extends StatefulWidget {
 class _AppShellState extends State<_AppShell> {
   String _activeItem = 'Dashboard';
   String? _selectedProjectId;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initAuth();
+  }
+
+  void _initAuth() {
+    String? token;
+    final uri = Uri.base;
+
+    // Check localStorage first
+    if (html.window.localStorage.containsKey('auth_token')) {
+      token = html.window.localStorage['auth_token'];
+    }
+
+    // Override if we just returned from OAuth callback
+    if (uri.queryParameters.containsKey('token')) {
+      token = uri.queryParameters['token'];
+      html.window.localStorage['auth_token'] = token!;
+      // Clean up URL
+      html.window.history.replaceState(null, 'TaskSync', uri.path);
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final appState = context.read<AppState>();
+      await appState.checkAuth(token);
+      if (appState.currentUser != null) {
+        if (appState.currentUser!.role == 'Member') {
+          setState(() => _activeItem = 'My Tasks');
+        }
+        await appState.loadAll();
+      }
+      if (mounted) {
+        setState(() => _initialized = true);
+      }
+    });
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Set first project once data loads
     final appState = context.read<AppState>();
     if (_selectedProjectId == null && appState.projects.isNotEmpty) {
       _selectedProjectId = appState.projects.first.id;
@@ -92,12 +132,7 @@ class _AppShellState extends State<_AppShell> {
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
 
-    // Auto-select first project when data arrives
-    if (_selectedProjectId == null && appState.projects.isNotEmpty) {
-      _selectedProjectId = appState.projects.first.id;
-    }
-
-    if (appState.loading) {
+    if (!_initialized || (appState.loading && appState.currentUser != null)) {
       return const Scaffold(
         backgroundColor: Color(0xFFF8FAFC),
         body: Center(
@@ -114,6 +149,17 @@ class _AppShellState extends State<_AppShell> {
           ),
         ),
       );
+    }
+
+    if (appState.currentUser == null) {
+      // Only show the error banner if it was truly a network/connection error
+      final hasConnectionError = appState.error == 'connection_failed';
+      return AuthScreen(connectionError: hasConnectionError);
+    }
+
+    // Auto-select first project when data arrives
+    if (_selectedProjectId == null && appState.projects.isNotEmpty) {
+      _selectedProjectId = appState.projects.first.id;
     }
 
     if (appState.error != null) {

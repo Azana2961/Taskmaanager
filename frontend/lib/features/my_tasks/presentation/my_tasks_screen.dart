@@ -91,7 +91,7 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
           Expanded(
             child: Column(
               children: [
-                const Header(),
+                Header(selectedProjectId: widget.selectedProjectId),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24),
@@ -568,33 +568,6 @@ class _RunningTaskCard extends StatelessWidget {
             style: TextStyle(color: Colors.grey[600], fontSize: 13),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 14),
-
-          // Progress Bar
-          Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: const LinearProgressIndicator(
-                    value: 0.5,
-                    backgroundColor: Color(0xFFE2E8F0),
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
-                    minHeight: 6,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                '50%',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2563EB),
-                ),
-              ),
-            ],
           ),
           const SizedBox(height: 14),
 

@@ -18,19 +18,7 @@ async function main() {
   await prisma.user.deleteMany();
   console.log('✅ Cleared existing data');
 
-  // ── Tags ───────────────────────────────────────────────────────────────────
-  const tagsList = [
-    { name: 'Dev', color: '#2563EB' },
-    { name: 'Design', color: '#7C3AED' },
-    { name: 'Bug', color: '#EA580C' },
-    { name: 'Marketing', color: '#4F46E5' },
-    { name: 'QA', color: '#DB2777' },
-    { name: 'Docs', color: '#0D9488' }
-  ];
-  const createdTags = await Promise.all(tagsList.map(t => prisma.tag.create({ data: t })));
-  const tagMap = {};
-  createdTags.forEach(t => tagMap[t.name] = t.id);
-  console.log('✅ Created 6 global tags');
+
 
   // ── Users / Team Members ───────────────────────────────────────────────────
   const alex = await prisma.user.create({
@@ -80,6 +68,7 @@ async function main() {
     data: {
       name: 'Website Redesign',
       colorCode: '#2563EB',
+      ownerId: alex.id,
       members: { connect: [{ id: alex.id }, { id: sarah.id }] },
     },
   });
@@ -88,6 +77,7 @@ async function main() {
     data: {
       name: 'Q4 Marketing',
       colorCode: '#7C3AED',
+      ownerId: sarah.id,
       members: { connect: [{ id: sarah.id }, { id: priya.id }] },
     },
   });
@@ -96,11 +86,32 @@ async function main() {
     data: {
       name: 'Mobile App',
       colorCode: '#059669',
+      ownerId: james.id,
       members: { connect: [{ id: alex.id }, { id: james.id }, { id: priya.id }] },
     },
   });
 
   console.log('✅ Created 3 projects');
+
+  // ── Tags (Now Project-Specific) ────────────────────────────────────────────
+  const tagsList = [
+    { name: 'Dev', color: '#2563EB', projectId: websiteRedesign.id },
+    { name: 'Design', color: '#7C3AED', projectId: websiteRedesign.id },
+    { name: 'Design', color: '#7C3AED', projectId: q4Marketing.id },
+    { name: 'QA', color: '#DB2777', projectId: q4Marketing.id },
+    { name: 'Bug', color: '#EA580C', projectId: mobileApp.id },
+    { name: 'Dev', color: '#2563EB', projectId: mobileApp.id },
+    { name: 'Docs', color: '#0D9488', projectId: mobileApp.id }
+  ];
+  const createdTags = await Promise.all(tagsList.map(t => prisma.tag.create({ data: t })));
+  
+  // Create a mapping helper for tasks
+  const tagMap = {};
+  createdTags.forEach(t => {
+    if (!tagMap[t.projectId]) tagMap[t.projectId] = {};
+    tagMap[t.projectId][t.name] = t.id;
+  });
+  console.log('✅ Created project-specific tags');
 
   // ── Tasks ───────────────────────────────────────────────────────────────────
   const tasksData = [
@@ -108,7 +119,7 @@ async function main() {
     {
       title: 'Build dashboard components',
       description: 'Create the main layout components for the new dashboard.',
-      tags: { connect: [{ id: tagMap['Dev'] }] },
+      tags: { connect: [{ id: tagMap[websiteRedesign.id]['Dev'] }] },
       priority: 'High',
       dueDate: new Date('2026-09-10'),
       status: 'IN_PROGRESS',
@@ -118,7 +129,7 @@ async function main() {
     {
       title: 'Implement dark mode toggle',
       description: 'Add a switch for dark mode in the header.',
-      tags: { connect: [{ id: tagMap['Design'] }] },
+      tags: { connect: [{ id: tagMap[websiteRedesign.id]['Design'] }] },
       priority: 'Low',
       dueDate: new Date('2026-09-08'),
       status: 'DONE',
@@ -129,7 +140,7 @@ async function main() {
     {
       title: 'Design new landing page hero',
       description: 'Create a modern hero section for the marketing site.',
-      tags: { connect: [{ id: tagMap['Design'] }] },
+      tags: { connect: [{ id: tagMap[websiteRedesign.id]['Design'] }] },
       priority: 'Medium',
       dueDate: new Date('2026-09-14'),
       status: 'TO_DO',
@@ -140,7 +151,7 @@ async function main() {
     {
       title: 'Create onboarding wireframes',
       description: 'Design wireframes for the new user onboarding flow.',
-      tags: { connect: [{ id: tagMap['Design'] }] },
+      tags: { connect: [{ id: tagMap[q4Marketing.id]['Design'] }] },
       priority: 'High',
       dueDate: new Date('2026-09-09'),
       status: 'IN_PROGRESS',
@@ -151,7 +162,7 @@ async function main() {
     {
       title: 'Write end-to-end test cases',
       description: 'Create test scenarios for the new checkout flow.',
-      tags: { connect: [{ id: tagMap['QA'] }] },
+      tags: { connect: [{ id: tagMap[q4Marketing.id]['QA'] }] },
       priority: 'Medium',
       dueDate: new Date('2026-09-13'),
       status: 'TO_DO',
@@ -162,7 +173,7 @@ async function main() {
     {
       title: 'Fix mobile responsive layout',
       description: 'Ensure the layout works on small screens.',
-      tags: { connect: [{ id: tagMap['Bug'] }] },
+      tags: { connect: [{ id: tagMap[mobileApp.id]['Bug'] }] },
       priority: 'Medium',
       dueDate: new Date('2026-09-12'),
       status: 'TO_DO',
@@ -173,7 +184,7 @@ async function main() {
     {
       title: 'Set up CI/CD pipeline',
       description: 'Configure GitHub Actions for automated builds.',
-      tags: { connect: [{ id: tagMap['Dev'] }] },
+      tags: { connect: [{ id: tagMap[mobileApp.id]['Dev'] }] },
       priority: 'High',
       dueDate: new Date('2026-09-11'),
       status: 'DONE',
@@ -183,7 +194,7 @@ async function main() {
     {
       title: 'Write API documentation',
       description: 'Document all REST endpoints for the v2 API.',
-      tags: { connect: [{ id: tagMap['Docs'] }] },
+      tags: { connect: [{ id: tagMap[mobileApp.id]['Docs'] }] },
       priority: 'Low',
       dueDate: new Date('2026-09-18'),
       status: 'TO_DO',
@@ -193,7 +204,7 @@ async function main() {
     {
       title: 'Implement authentication flow',
       description: 'Build JWT-based auth with refresh tokens.',
-      tags: { connect: [{ id: tagMap['Dev'] }] },
+      tags: { connect: [{ id: tagMap[mobileApp.id]['Dev'] }] },
       priority: 'High',
       dueDate: new Date('2026-09-07'),
       status: 'IN_PROGRESS',
