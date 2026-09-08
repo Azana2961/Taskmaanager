@@ -377,6 +377,24 @@ class ApiService {
     return ApiProject.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
+  static Future<ApiProject> updateProject(String projectId, Map<String, dynamic> data) async {
+    final res = await _client.put(
+      Uri.parse('$_baseUrl/projects/$projectId'),
+      headers: _headers,
+      body: jsonEncode(data),
+    );
+    _check(res);
+    return ApiProject.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  static Future<void> deleteProject(String projectId) async {
+    final res = await _client.delete(
+      Uri.parse('$_baseUrl/projects/$projectId'),
+      headers: _headers,
+    );
+    _check(res);
+  }
+
   // ── Tasks ─────────────────────────────────────────────────────────────────
 
   static Future<List<ApiTask>> getTasks({String? projectId}) async {

@@ -12,8 +12,17 @@ const include = {
 /**
  * Get all projects with members and tasks
  */
-const getAllProjects = async () => {
-  return prisma.project.findMany({ include, orderBy: { createdAt: 'asc' } });
+const getAllProjects = async (userId) => {
+  return prisma.project.findMany({
+    where: {
+      OR: [
+        { ownerId: userId },
+        { members: { some: { id: userId } } }
+      ]
+    },
+    include,
+    orderBy: { createdAt: 'asc' }
+  });
 };
 
 /**

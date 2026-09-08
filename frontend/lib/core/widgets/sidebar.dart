@@ -219,26 +219,43 @@ class _SidebarState extends State<Sidebar> with SingleTickerProviderStateMixin {
               // ── Bottom section ─────────────────────────────────────────────
               if (!_collapsed)
                 Container(
-                  padding: const EdgeInsets.all(20),
+                  margin: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.white.withValues(alpha: 0.0), Colors.white.withValues(alpha: 0.05)],
-                    ),
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Team Size', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 4),
-                      Text(
-                        widget.selectedProjectId == null
-                            ? 'No project selected'
-                            : '${appState.projectById(widget.selectedProjectId)?.members.length ?? 0} Members',
-                        style: const TextStyle(color: Colors.white54, fontSize: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Team',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2563EB).withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              widget.selectedProjectId == null ? '0' : '${appState.projectById(widget.selectedProjectId)?.members.length ?? 0}',
+                              style: const TextStyle(color: Color(0xFF60A5FA), fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 12),
+                      if (widget.selectedProjectId != null) ...[
+                        const SizedBox(height: 16),
+                        _buildTeamAvatars(appState.projectById(widget.selectedProjectId)?.members ?? []),
+                      ] else ...[
+                        const SizedBox(height: 12),
+                        const Text('No project selected', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                      ]
                     ],
                   ),
                 ),
@@ -373,6 +390,62 @@ class _SidebarState extends State<Sidebar> with SingleTickerProviderStateMixin {
         dense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         onTap: widget.onProjectTap != null ? () => widget.onProjectTap!(project.id) : null,
+      ),
+    );
+  }
+
+  Widget _buildTeamAvatars(List<ApiUser> members) {
+    if (members.isEmpty) return const SizedBox();
+    
+    final displayMembers = members.take(4).toList();
+    final remaining = members.length - displayMembers.length;
+
+    return SizedBox(
+      height: 36,
+      child: Stack(
+        children: [
+          for (int i = 0; i < displayMembers.length; i++)
+            Positioned(
+              left: i * 24.0,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF1E1F25),
+                  shape: BoxShape.circle,
+                ),
+                child: CircleAvatar(
+                  radius: 14,
+                  backgroundColor: displayMembers[i].color.withValues(alpha: 0.2),
+                  backgroundImage: displayMembers[i].avatarUrl != null ? NetworkImage(displayMembers[i].avatarUrl!) : null,
+                  child: displayMembers[i].avatarUrl == null
+                      ? Text(
+                          displayMembers[i].name.isNotEmpty ? displayMembers[i].name[0].toUpperCase() : 'U',
+                          style: TextStyle(color: displayMembers[i].color, fontSize: 10, fontWeight: FontWeight.bold),
+                        )
+                      : null,
+                ),
+              ),
+            ),
+          if (remaining > 0)
+            Positioned(
+              left: displayMembers.length * 24.0,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF1E1F25),
+                  shape: BoxShape.circle,
+                ),
+                child: CircleAvatar(
+                  radius: 14,
+                  backgroundColor: const Color(0xFF334155),
+                  child: Text(
+                    '+$remaining',
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -45,6 +45,11 @@ class Header extends StatelessWidget {
           // Inbox / Notifications Icon
           _InboxButton(appState: appState),
 
+          if (selectedProjectId != null) ...[
+            const SizedBox(width: 8),
+            _ProjectSettingsMenu(appState: appState, selectedProjectId: selectedProjectId!),
+          ],
+
           const SizedBox(width: 8),
 
           // User Profile
@@ -269,6 +274,109 @@ class _InviteCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ProjectSettingsMenu extends StatelessWidget {
+  final AppState appState;
+  final String selectedProjectId;
+
+  const _ProjectSettingsMenu({required this.appState, required this.selectedProjectId});
+
+  @override
+  Widget build(BuildContext context) {
+    final isManager = appState.isManagerOfProject(selectedProjectId);
+
+    return PopupMenuButton<String>(
+      tooltip: 'Project Settings',
+      icon: const Icon(Icons.more_vert, color: Color(0xFF64748B), size: 22),
+      onSelected: (val) async {
+        if (val == 'delete') {
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Delete Project', style: TextStyle(color: Colors.red)),
+              content: const Text('Are you sure you want to delete this project? This action cannot be undone.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('Delete', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+          );
+
+          if (confirm == true) {
+            await appState.deleteProject(selectedProjectId);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Project deleted successfully')),
+              );
+            }
+          }
+        } else if (val == 'leave') {
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Leave Project', style: TextStyle(color: Colors.orange)),
+              content: const Text('Are you sure you want to leave this project? You will no longer have access to its tasks.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                  child: const Text('Leave', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+          );
+
+          if (confirm == true) {
+            final currentUser = appState.currentUser;
+            if (currentUser != null) {
+              await appState.removeMemberFromProject(selectedProjectId, currentUser.id);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('You have left the project')),
+                );
+              }
+            }
+          }
+        }
+      },
+      itemBuilder: (ctx) => [
+        if (isManager)
+          const PopupMenuItem(
+            value: 'delete',
+            child: Row(
+              children: [
+                Icon(Icons.delete_outline, color: Colors.red, size: 18),
+                SizedBox(width: 8),
+                Text('Delete Project', style: TextStyle(color: Colors.red)),
+              ],
+            ),
+          ),
+        if (!isManager)
+          const PopupMenuItem(
+            value: 'leave',
+            child: Row(
+              children: [
+                Icon(Icons.exit_to_app, color: Colors.orange, size: 18),
+                SizedBox(width: 8),
+                Text('Leave Project', style: TextStyle(color: Colors.orange)),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
