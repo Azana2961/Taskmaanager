@@ -37,7 +37,7 @@ router.get(
     });
 
     // Redirect to frontend
-    res.redirect(`${FRONTEND_URL}/?token=${token}`);
+    res.redirect(`${process.env.CLIENT_URL || 'http://localhost:8080'}/?token=${token}`);
   }
 );
 
