@@ -8,7 +8,7 @@ class AuthScreen extends StatelessWidget {
 
   void _loginWithGoogle() {
     // Redirect to backend OAuth route
-    html.window.location.href = 'http://localhost:5000/api/auth/google';
+    html.window.location.href = 'https://taskmaanager.onrender.com/api/auth/google';
   }
 
   @override
