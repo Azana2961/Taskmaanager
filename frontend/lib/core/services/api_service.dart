@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 
 /// Base URL of the TaskSync backend.
 /// Change this if deploying to a remote server.
-const String _baseUrl = 'http://localhost:5000/api';
+const String _baseUrl = 'https://taskmaanager.onrender.com/api';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lightweight API models (match backend JSON exactly)
